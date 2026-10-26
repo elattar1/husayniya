@@ -1,8 +1,23 @@
-import { createFileRoute } from "@tanstack/react-router";
-
-export const Route = createFileRoute("/cart")({
-  head: () => ({ meta: [{ title: "خدمات الحسينية" }] }),
-  component: () => (
-    <div className="mx-auto max-w-3xl p-6 text-center text-muted-foreground">هذه الصفحة قيد الإنشاء</div>
-  ),
-});
+import { createFileRoute, Link } from '@tanstack/react-router';
+import { useSuspenseQuery, useQueryClient } from '@tanstack/react-query';
+import { useServerFn } from '@tanstack/react-start';
+import { useState, type FormEvent } from 'react';
+import { ShoppingCart, Minus, Plus, Trash2, ArrowLeft } from 'lucide-react';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useCart } from '@/lib/cart';
+import { useAuth } from '@/lib/auth';
+import { catalogQuery } from '@/lib/customer-queries';
+import { placeCustomerOrder } from '@/lib/customer.functions';
+import { money } from '@/lib/labels';
+import { pageMeta } from '@/lib/page-meta';
+import { CustomerError, CustomerNotFound } from '@/components/CustomerFeedback';
+export const Route = createFileRoute('/cart')({ loader: ({ context }) => context.queryClient.ensureQueryData(catalogQuery), head: () => pageMeta('سلة المشتريات', 'مراجعة المشتريات وتحديد العنوان وإرسال طلبك إلى متاجر الحسينية'), component: Cart, errorComponent: CustomerError, notFoundComponent: CustomerNotFound });
+function Cart() {
+  const cart = useCart(); const { user } = useAuth(); const { data } = useSuspenseQuery(catalogQuery); const [busy,setBusy] = useState(false); const place = useServerFn(placeCustomerOrder); const navigate = Route.useNavigate(); const client = useQueryClient();
+  const store = data.stores.find(s => s.id === cart.store_id); const items = cart.items.map(i => ({ ...i, product: data.products.find(p => p.id === i.product_id && p.store_id === cart.store_id) }));
+  const subtotal = items.reduce((sum,i) => sum + Number(i.product?.price ?? i.price)*i.qty, 0); const unavailable = !store?.is_open || items.some(i => !i.product?.is_available);
+  async function submit(e: FormEvent<HTMLFormElement>) { e.preventDefault(); if (!cart.store_id) return; const form = new FormData(e.currentTarget); setBusy(true); try { await place({ data: { store_id: cart.store_id, items: cart.items.map(i => ({ product_id: i.product_id, qty: i.qty })), address: String(form.get('address')), phone: String(form.get('phone')), area_id: Number(form.get('area')) || null, notes: String(form.get('notes')) } }); cart.clear(); await client.invalidateQueries({ queryKey: ['customer-orders'] }); toast.success('تم إرسال طلبك إلى المتجر'); navigate({ to: '/orders' }); } catch(error) { toast.error(error instanceof Error ? error.message : 'تعذر إرسال الطلب'); } finally { setBusy(false); } }
+  return <div className="mx-auto max-w-5xl px-4 py-8"><h1 className="mb-7 text-3xl">سلة المشتريات</h1>{!items.length ? <div className="space-y-5 py-16 text-center"><ShoppingCart className="mx-auto size-14 text-muted-foreground" /><p>السلة فارغة</p><Button asChild><Link to="/">تصفح المتاجر <ArrowLeft /></Link></Button></div> : <div className="grid gap-8 md:grid-cols-[1.2fr_1fr]"><section><h2 className="mb-4 text-xl">{cart.store_name}</h2>{items.map(i => <div key={i.product_id} className="flex flex-wrap items-center justify-between gap-3 border-b py-4"><div><h3 className="font-sans font-semibold">{i.product?.name ?? i.name}</h3><p className="mt-2 text-primary">{money(Number(i.product?.price ?? i.price)*i.qty)}</p>{!i.product?.is_available && <p className="text-xs text-destructive">المنتج غير متاح، احذفه من السلة</p>}</div><div className="flex items-center gap-2"><Button size="icon" variant="outline" aria-label={`تقليل ${i.name}`} onClick={() => cart.setQty(i.product_id,i.qty-1)}><Minus /></Button><span className="w-6 text-center">{i.qty}</span><Button size="icon" variant="outline" disabled={i.qty >= 99} aria-label={`زيادة ${i.name}`} onClick={() => cart.setQty(i.product_id,i.qty+1)}><Plus /></Button><Button size="icon" variant="ghost" aria-label={`حذف ${i.name}`} onClick={() => cart.setQty(i.product_id,0)}><Trash2 /></Button></div></div>)}<dl className="mt-6 space-y-3"><div className="flex justify-between"><dt>قيمة المنتجات</dt><dd>{money(subtotal)}</dd></div><div className="flex justify-between"><dt>التوصيل</dt><dd>{money(store?.delivery_fee)}</dd></div><div className="flex justify-between border-t pt-3 text-lg font-semibold"><dt>الإجمالي</dt><dd>{money(subtotal+Number(store?.delivery_fee ?? 0))}</dd></div></dl></section><section className="border-t pt-5 md:border-r md:border-t-0 md:pr-8 md:pt-0"><h2 className="mb-5 text-xl">بيانات التوصيل</h2>{!user ? <Button asChild><Link to="/auth" search={{ redirect: '/cart' }}>سجل الدخول لإتمام الطلب</Link></Button> : <form onSubmit={submit} className="space-y-4"><label className="block space-y-2 text-sm">المنطقة<select name="area" required className="h-10 w-full rounded-md border bg-card px-3" defaultValue={store?.area_id ?? ''}><option value="">اختر المنطقة</option>{data.areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label><label className="block space-y-2 text-sm">العنوان بالتفصيل<Input name="address" required minLength={3} placeholder="الشارع، رقم المنزل، علامة مميزة" /></label><label className="block space-y-2 text-sm">رقم الهاتف<Input name="phone" type="tel" required minLength={6} /></label><label className="block space-y-2 text-sm">ملاحظات<Input name="notes" /></label><p className="border-y py-3 text-sm text-muted-foreground">طريقة الدفع: نقدًا عند الاستلام</p>{unavailable && <p className="text-sm text-destructive">المتجر مغلق أو توجد منتجات غير متاحة</p>}<Button className="w-full" type="submit" disabled={busy || unavailable}>{busy ? 'جاري إرسال الطلب...' : 'تأكيد وإرسال الطلب'}<ArrowLeft /></Button></form>}</section></div>}</div>;
+}

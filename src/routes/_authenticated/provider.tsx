@@ -9,7 +9,7 @@ export const Route = createFileRoute("/_authenticated/provider")({
   loader: ({ context }) => context.queryClient.ensureQueryData(dashboardQuery(false)),
   head: () => pageMeta("لوحة مقدم الخدمة", "إدارة المتجر والمنتجات والطلبات والحجوزات ومستحقات مقدم الخدمة في خدمات الحسينية"),
   component: Provider,
-  errorComponent: ({ error }) => <DashboardError message={error.message} />,
+  errorComponent: ({ error }) => <DashboardError message={error instanceof Error ? error.message : "تعذر تحميل البيانات"} />,
   notFoundComponent: () => <p>المتجر غير موجود</p>,
 });
 
