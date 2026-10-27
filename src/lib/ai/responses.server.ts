@@ -1,5 +1,6 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import { streamText, type ModelMessage } from "ai";
+import { streamText, Output, type ModelMessage } from "ai";
+import { recommendationOutput } from '../recommendation-rules';
 
 import {
   createLovableAiGatewayRunIdFetch,
@@ -9,7 +10,7 @@ import {
 
 export function createResponsesCall(
   request: Request,
-  config: { baseURL: string; apiKey: string; model: string },
+  config: { baseURL: string; apiKey: string; model: string; inspectResponse: (response: Response) => Promise<void> },
   messages: ModelMessage[],
   instructions?: string,
 ) {
@@ -18,7 +19,11 @@ export function createResponsesCall(
     baseURL: `${config.baseURL.replace(/\/+$/, "").replace(/\/v1$/, "")}/v1`,
     apiKey: config.apiKey,
     headers: { "Lovable-API-Key": config.apiKey, "X-Lovable-AIG-SDK": "vercel-ai-sdk" },
-    fetch: runIdFetch.fetch,
+    fetch: async (input, init) => {
+      const response = await runIdFetch.fetch(input, init);
+      await config.inspectResponse(response);
+      return response;
+    },
   });
   const reasoning = config.model !== "openai/chat-latest";
   const result = streamText({
@@ -27,6 +32,7 @@ export function createResponsesCall(
     ...(instructions ? { instructions } : {}),
     messages,
     maxRetries: 0,
+    output: Output.object({ schema: recommendationOutput }),
     abortSignal: request.signal,
     providerOptions: {
       openai: {
@@ -34,7 +40,7 @@ export function createResponsesCall(
         ...(reasoning
           ? {
               forceReasoning: true,
-              reasoningEffort: "medium",
+              reasoningEffort: "low",
               reasoningSummary: "auto",
               include: ["reasoning.encrypted_content"],
             }
