@@ -1,3 +1,4 @@
+import type { SearchSchemaInput } from '@tanstack/react-router';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { Search, MapPin, ArrowLeft, Star, Clock3 } from 'lucide-react';
@@ -10,7 +11,7 @@ import { CustomerError, CustomerNotFound } from '@/components/CustomerFeedback';
 import hero from '@/assets/hero.jpg';
 import { ServiceRecommendations } from '@/components/ServiceRecommendations';
 export const Route = createFileRoute('/')({
-  validateSearch: (s: { q?: unknown; category?: unknown; area?: unknown }) => ({ q: typeof s.q === 'string' ? s.q : '', category: typeof s.category === 'string' ? s.category : '', area: typeof s.area === 'string' ? s.area : '' }),
+  validateSearch: (s: SearchSchemaInput & { q?: unknown; category?: unknown; area?: unknown }) => ({ q: typeof s.q === 'string' ? s.q : '', category: typeof s.category === 'string' ? s.category : '', area: typeof s.area === 'string' ? s.area : '' }),
   loader: ({ context }) => context.queryClient.ensureQueryData(catalogQuery),
   head: () => pageMeta('المتاجر والخدمات في الحسينية', 'ابحث عن متاجر الحسينية والمطاعم والأطباء والخدمات المنزلية، واطلب وتابع طلبك من مكان واحد'),
   component: Browse, errorComponent: CustomerError, notFoundComponent: CustomerNotFound,
