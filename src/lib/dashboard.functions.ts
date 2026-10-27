@@ -81,10 +81,11 @@ export const updateRequest = createServerFn({ method: "POST" }).middleware([requ
     if ((!owner.data && !admin.data) || owner.error || admin.error) throw new Error("لا تملك صلاحية إدارة هذا الطلب");
     if (!allowedNext(data.kind, existing.data.status).includes(data.status)) throw new Error("لا يمكن الانتقال إلى هذه الحالة");
     if (data.kind === "service_requests" && data.status === "completed" && data.quoted_price === undefined) throw new Error("أدخل السعر النهائي للخدمة");
-    const values = data.kind === "service_requests"
-      ? { status: data.status, ...(data.quoted_price !== undefined ? { quoted_price: data.quoted_price } : {}) }
-      : data.kind === "orders" && data.status === "delivered" ? { status: data.status, payment_status: "paid_cash" } : { status: data.status };
-    const result = await context.supabase.from(data.kind).update(values).eq("id", data.id).eq("status", existing.data.status).select("id").single();
+    const result = data.kind === "service_requests"
+      ? await context.supabase.from("service_requests").update({ status: data.status, ...(data.quoted_price !== undefined ? { quoted_price: data.quoted_price } : {}) }).eq("id", data.id).eq("status", existing.data.status).select("id").single()
+      : data.kind === "orders"
+        ? await context.supabase.from("orders").update({ status: data.status, ...(data.status === "delivered" ? { payment_status: "paid_cash" } : {}) }).eq("id", data.id).eq("status", existing.data.status).select("id").single()
+        : await context.supabase.from("bookings").update({ status: data.status }).eq("id", data.id).eq("status", existing.data.status).select("id").single();
     if (result.error) throw new Error(result.error.message);
     return result.data;
   });

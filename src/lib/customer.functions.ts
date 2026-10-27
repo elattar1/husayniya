@@ -7,7 +7,7 @@ import { TIME_SLOTS } from './labels';
 export const placeCustomerOrder = createServerFn({ method: 'POST' }).middleware([requireSupabaseAuth]).inputValidator(checkoutInput).handler(async ({ data, context }) => {
   const store = await context.supabase.from('stores').select('is_active,is_open,category').eq('id', data.store_id).single();
   if (!store.data?.is_active || !store.data.is_open || ['doctors', 'maintenance', 'home'].includes(store.data.category)) throw new Error('المتجر غير متاح للطلب الآن');
-  const result = await context.supabase.rpc('place_order', { _store_id: data.store_id, _items: data.items, _address: data.address, _phone: data.phone, _notes: data.notes, _area_id: data.area_id });
+  const result = await context.supabase.rpc('place_order', { _store_id: data.store_id, _items: data.items, _address: data.address, _phone: data.phone, _notes: data.notes, ...(data.area_id !== null ? { _area_id: data.area_id } : {}) });
   if (result.error || !result.data) throw new Error('تعذر إرسال الطلب؛ تحقق من توفر المنتجات وحاول مرة أخرى');
   return { id: result.data };
 });
@@ -22,7 +22,7 @@ export const createServiceRequest = createServerFn({ method: 'POST' }).middlewar
   const store = await context.supabase.from('stores').select('category,is_active,is_open').eq('id', data.store_id).single();
   if (!store.data?.is_active || !store.data.is_open || !['maintenance','home'].includes(store.data.category)) throw new Error('مقدم الخدمة غير متاح');
   if (data.image_paths.some(p => !p.startsWith(`${context.userId}/`) || p.includes('..'))) throw new Error('صور غير صالحة');
-  const result = await context.supabase.from('service_requests').insert({ ...data, customer_id: context.userId }).select('id').single();
+  const result = await context.supabase.from('service_requests').insert({ store_id: data.store_id, description: data.description + (data.notes ? `\n${data.notes}` : ''), address: data.address, phone: data.phone, area_id: data.area_id, preferred_date: data.preferred_date, image_paths: data.image_paths, customer_id: context.userId }).select('id').single();
   if (result.error) throw new Error('تعذر إرسال طلب الخدمة'); return result.data;
 });
 export const getCustomerOrders = createServerFn({ method: 'POST' }).middleware([requireSupabaseAuth]).handler(async ({ context }) => {
