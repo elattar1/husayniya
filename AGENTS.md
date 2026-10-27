@@ -15,3 +15,6 @@
 
 - Customer catalog reads use a public publishable server client; customer mutations and private tracking use authenticated server functions with explicit customer scoping, so the shared dashboard records remain authoritative.
 - Customer orders and notifications live under the authenticated pathless layout; cart and store pages remain public with inline sign-in for submissions.
+
+- AI recommendations use authenticated server functions, streamed structured Responses calls, and server-side catalog-ID grounding; only active catalog stores in the selected area may appear.
+- Gateway provider denials persist in a service-role-only access-state table; recovery requires access restoration and explicit owner clearance before fresh requests.

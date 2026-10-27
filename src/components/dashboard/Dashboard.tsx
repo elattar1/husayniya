@@ -16,7 +16,7 @@ import { money, dateAr, STATUS_LABELS } from "@/lib/labels";
 
 type StoreRow = DashboardData["stores"][number];
 type ProductRow = DashboardData["products"][number];
-type Task = LedgerRow & { id: string; phone: string; detail: string; address: string; notes: string | null; items: { name: string; qty: number; price: number }[]; images: string[]; appointment?: string };
+type Task = LedgerRow & { id: string; phone: string; detail: string; address: string; notes: string | null; items: { name: string; qty: number; price: number }[]; images: string[]; appointment?: string | undefined };
 
 function tasksFrom(data: DashboardData): Task[] {
   return [

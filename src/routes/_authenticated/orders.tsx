@@ -14,7 +14,7 @@ import { dateAr, money, STATUS_LABELS } from '@/lib/labels';
 import { pageMeta } from '@/lib/page-meta';
 import { CustomerError, CustomerNotFound } from '@/components/CustomerFeedback';
 export const Route = createFileRoute('/_authenticated/orders')({
-  validateSearch: (s: Record<string, unknown>) => ({ filter: ['all','active','completed','cancelled'].includes(String(s.filter)) ? String(s.filter) : 'all' }),
+  validateSearch: (s: { filter?: unknown }) => ({ filter: ['all','active','completed','cancelled'].includes(String(s.filter)) ? String(s.filter) : 'all' }),
   loader: async ({ context }) => { await Promise.all([context.queryClient.ensureQueryData(customerOrdersQuery), context.queryClient.ensureQueryData(catalogQuery)]); },
   head: () => pageMeta('طلباتي وحجوزاتي', 'متابعة الطلبات وحجوزات الأطباء والخدمات المنزلية في خدمات الحسينية'),
   component: Orders, errorComponent: CustomerError, notFoundComponent: CustomerNotFound,

@@ -5,7 +5,7 @@ import { pageMeta } from "@/lib/page-meta";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_authenticated/provider")({
-  validateSearch: (s: Record<string, unknown>) => ({ q: typeof s.q === "string" ? s.q : "", tab: ["stores", "products", "orders", "earnings"].includes(String(s.tab)) ? String(s.tab) : "stores" }),
+  validateSearch: (s: { q?: unknown; tab?: unknown }) => ({ q: typeof s.q === "string" ? s.q : "", tab: ["stores", "products", "orders", "earnings"].includes(String(s.tab)) ? String(s.tab) : "stores" }),
   loader: ({ context }) => context.queryClient.ensureQueryData(dashboardQuery(false)),
   head: () => pageMeta("لوحة مقدم الخدمة", "إدارة المتجر والمنتجات والطلبات والحجوزات ومستحقات مقدم الخدمة في خدمات الحسينية"),
   component: Provider,

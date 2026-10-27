@@ -11,7 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/_authenticated/admin")({
-  validateSearch: (s: Record<string, unknown>) => ({ q: typeof s.q === "string" ? s.q : "", tab: ["stores", "orders", "earnings"].includes(String(s.tab)) ? String(s.tab) : "stores" }),
+  validateSearch: (s: { q?: unknown; tab?: unknown }) => ({ q: typeof s.q === "string" ? s.q : "", tab: ["stores", "orders", "earnings"].includes(String(s.tab)) ? String(s.tab) : "stores" }),
   loader: ({ context }) => context.queryClient.ensureQueryData(dashboardQuery(true)),
   head: () => pageMeta("لوحة الإدارة", "اعتماد المتاجر وضبط العمولات ومراجعة الطلبات والأرباح في خدمات الحسينية"),
   component: Admin,
