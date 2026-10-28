@@ -33,3 +33,7 @@ export function earnings(rows: LedgerRow[]) {
     return { gross: sum.gross + row.amount, commission: sum.commission + row.commission, net: sum.net + row.amount - row.commission, count: sum.count + 1 };
   }, { gross: 0, commission: 0, net: 0, count: 0 });
 }
+export const catalogImportInput = z.object({
+  store_id: z.string().uuid(),
+  items: z.array(z.object({ key: z.string().min(1).max(40), price: z.coerce.number().min(0).max(100000), stock_qty: z.coerce.number().int().min(0).max(100000).nullable() })).min(1).max(200),
+});
