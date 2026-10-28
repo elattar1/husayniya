@@ -31,7 +31,7 @@ export function CatalogPicker({ storeId, existing, open, onOpenChange }: { store
   }
   async function submit() {
     const items = selected.map(key => ({ key, price: Number(picks[key]!.price), stock_qty: picks[key]!.qty === "" ? null : Number(picks[key]!.qty) }));
-    if (items.some(i => !(i.price >= 0) || (i.stock_qty !== null && !(Number.isInteger(i.stock_qty) && i.stock_qty >= 0)))) return toast.error("راجع الأسعار والكميات");
+    if (items.some(i => !(i.price >= 0) || (i.stock_qty !== null && !(Number.isInteger(i.stock_qty) && i.stock_qty >= 0)))) { toast.error("راجع الأسعار والكميات"); return; }
     setBusy(true);
     try {
       const r = await doImport({ data: { store_id: storeId, items } });
