@@ -36,6 +36,13 @@
       "when": 1793162964340,
       "tag": "0004_product_catalog_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793163002262,
+      "tag": "0005_product_catalog_unique_full",
+      "breakpoints": true
     }
   ]
 }
