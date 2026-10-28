@@ -263,30 +263,39 @@ export type Database = {
       }
       products: {
         Row: {
+          catalog_key: string | null
           created_at: string
           description: string
           id: string
+          image_url: string | null
           is_available: boolean
           name: string
           price: number
+          stock_qty: number | null
           store_id: string
         }
         Insert: {
+          catalog_key?: string | null
           created_at?: string
           description?: string
           id?: string
+          image_url?: string | null
           is_available?: boolean
           name: string
           price: number
+          stock_qty?: number | null
           store_id: string
         }
         Update: {
+          catalog_key?: string | null
           created_at?: string
           description?: string
           id?: string
+          image_url?: string | null
           is_available?: boolean
           name?: string
           price?: number
+          stock_qty?: number | null
           store_id?: string
         }
         Relationships: [

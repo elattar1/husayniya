@@ -1,7 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
-import { storeInput, productInput, commissionInput, requestKinds, allowedNext } from "./dashboard-rules";
+import { storeInput, productInput, commissionInput, requestKinds, allowedNext, catalogImportInput } from "./dashboard-rules";
+import { catalogItem, catalogImage } from "./supermarket-catalog";
 
 export const getDashboard = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -88,4 +89,18 @@ export const updateRequest = createServerFn({ method: "POST" }).middleware([requ
         : await context.supabase.from("bookings").update({ status: data.status }).eq("id", data.id).eq("status", existing.data.status).select("id").single();
     if (result.error) throw new Error(result.error.message);
     return result.data;
+  });
+export const importCatalogProducts = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])
+  .inputValidator(catalogImportInput).handler(async ({ context, data }) => {
+    const store = await context.supabase.from("stores").select("id,category").eq("id", data.store_id).eq("owner_id", context.userId).single();
+    if (store.error || !store.data) throw new Error("لا تملك صلاحية تعديل منتجات هذا المتجر");
+    if (store.data.category !== "supermarkets") throw new Error("الكتالوج الجاهز متاح لمتاجر السوبر ماركت فقط");
+    const rows = data.items.map(i => {
+      const item = catalogItem(i.key);
+      if (!item) throw new Error("منتج غير موجود في الكتالوج");
+      return { store_id: data.store_id, catalog_key: item.key, name: item.name, description: item.size, image_url: catalogImage(item.group), price: i.price, stock_qty: i.stock_qty, is_available: i.stock_qty !== 0 };
+    });
+    const result = await context.supabase.from("products").upsert(rows, { onConflict: "store_id,catalog_key" }).select("id");
+    if (result.error) throw new Error(result.error.message);
+    return { count: result.data.length };
   });
