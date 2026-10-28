@@ -7,7 +7,8 @@ import { TIME_SLOTS } from './labels';
 export const placeCustomerOrder = createServerFn({ method: 'POST' }).middleware([requireSupabaseAuth]).inputValidator(checkoutInput).handler(async ({ data, context }) => {
   const store = await context.supabase.from('stores').select('is_active,is_open,category').eq('id', data.store_id).single();
   if (!store.data?.is_active || !store.data.is_open || ['doctors', 'maintenance', 'home'].includes(store.data.category)) throw new Error('المتجر غير متاح للطلب الآن');
-  const result = await context.supabase.rpc('place_order', { _store_id: data.store_id, _items: data.items, _address: data.address, _phone: data.phone, _notes: data.notes, ...(data.area_id !== null ? { _area_id: data.area_id } : {}) });
+  const args = { _store_id: data.store_id, _items: data.items, _address: data.address, _phone: data.phone, _notes: data.notes, ...(data.area_id !== null ? { _area_id: data.area_id } : {}) };
+  const result = await context.supabase.rpc('place_order', args as typeof args & { _area_id: number });
   if (result.error || !result.data) throw new Error('تعذر إرسال الطلب؛ تحقق من توفر المنتجات وحاول مرة أخرى');
   return { id: result.data };
 });

@@ -7,7 +7,10 @@ import { useAuth } from "@/lib/auth";
 import { pageMeta } from "@/lib/page-meta";
 
 export const Route = createFileRoute("/auth")({
-  validateSearch: (s: Record<string, unknown>) => ({ redirect: typeof s.redirect === "string" && s.redirect.startsWith("/") && !s.redirect.startsWith("//") ? s.redirect : "/" }),
+  validateSearch: (s: Record<string, unknown>) => {
+    const r = s["redirect"];
+    return { redirect: typeof r === "string" && r.startsWith("/") && !r.startsWith("//") ? r : "/" };
+  },
   head: () => pageMeta("تسجيل الدخول", "تسجيل الدخول لطلب الخدمات ومتابعتها وإدارة متجرك في خدمات الحسينية"),
   component: Auth,
 });
