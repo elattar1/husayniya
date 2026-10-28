@@ -1,0 +1,16 @@
+{
+  "name": "خدمات الحسينية",
+  "short_name": "خدمات الحسينية",
+  "description": "اطلب من المطاعم والسوبر ماركت والصيدليات واحجز الأطباء والصيانة في الحسينية",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#045353",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
