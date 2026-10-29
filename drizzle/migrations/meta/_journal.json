@@ -43,6 +43,13 @@
       "when": 1793163002262,
       "tag": "0005_product_catalog_unique_full",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793235678101,
+      "tag": "0006_remove_first_admin_claim",
+      "breakpoints": true
     }
   ]
 }
