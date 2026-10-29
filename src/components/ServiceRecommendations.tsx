@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useServerFn } from '@tanstack/react-start';
 import { Sparkles, ArrowLeft, LoaderCircle, MapPin } from 'lucide-react';
@@ -9,10 +9,54 @@ import type { Catalog } from '@/lib/customer-queries';
 import { recommendationInput, type RecommendationOutput } from '@/lib/recommendation-rules';
 import { recommendServices } from '@/lib/recommendations.functions';
 
+const EXAMPLES = [
+  'محتاج سباك يصلح تسريب تحت حوض المطبخ',
+  'عايز أحجز عند دكتور أطفال بكرة الصبح',
+  'نفسي في بيتزا وعصير توصيل للبيت',
+  'محتاج كهربائي يركب نجفة في الصالة',
+  'عايز صيدلية فيها دوا برد وبنادول',
+  'محتاج طلبات سوبر ماركت: رز وزيت وسكر',
+  'نجار يصلح باب دولاب مكسور',
+  'هدية عيد ميلاد لبنت عندها 10 سنين',
+  'فني يصلح غسالة مش بتعصر',
+];
+
+function useTypewriter(active: boolean) {
+  const [text, setText] = useState('');
+  useEffect(() => {
+    if (!active) return;
+    let order = [...EXAMPLES].sort(() => Math.random() - 0.5);
+    let i = 0, pos = 0, deleting = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      const full = order[i] ?? '';
+      if (!deleting) {
+        pos++;
+        setText(full.slice(0, pos));
+        if (pos === full.length) { deleting = true; timer = setTimeout(tick, 1800); return; }
+        timer = setTimeout(tick, 70);
+      } else {
+        pos--;
+        setText(full.slice(0, pos));
+        if (pos === 0) {
+          deleting = false; i++;
+          if (i >= order.length) { order = [...EXAMPLES].sort(() => Math.random() - 0.5); i = 0; }
+          timer = setTimeout(tick, 400); return;
+        }
+        timer = setTimeout(tick, 35);
+      }
+    };
+    timer = setTimeout(tick, 500);
+    return () => clearTimeout(timer);
+  }, [active]);
+  return text;
+}
+
 export function ServiceRecommendations({ catalog, area }: { catalog: Catalog; area: string }) {
   const { user } = useAuth();
   const recommend = useServerFn(recommendServices);
   const [description, setDescription] = useState('');
+  const typed = useTypewriter(!description);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<RecommendationOutput | null>(null);
