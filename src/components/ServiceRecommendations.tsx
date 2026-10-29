@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useServerFn } from '@tanstack/react-start';
 import { Sparkles, ArrowLeft, LoaderCircle, MapPin } from 'lucide-react';
@@ -29,7 +29,7 @@ function useTypewriter(active: boolean) {
     let i = 0, pos = 0, deleting = false;
     let timer: ReturnType<typeof setTimeout>;
     const tick = () => {
-      const full = order[i];
+      const full = order[i] ?? '';
       if (!deleting) {
         pos++;
         setText(full.slice(0, pos));
