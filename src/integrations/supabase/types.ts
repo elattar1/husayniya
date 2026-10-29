@@ -124,6 +124,30 @@ export type Database = {
         }
         Relationships: []
       }
+      drivers: {
+        Row: {
+          created_at: string
+          full_name: string
+          is_active: boolean
+          phone: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          full_name: string
+          is_active?: boolean
+          phone: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          full_name?: string
+          is_active?: boolean
+          phone?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           body: string
@@ -196,13 +220,16 @@ export type Database = {
           commission_amount: number
           created_at: string
           customer_id: string
+          delivered_at: string | null
           delivery_fee: number
+          driver_id: string | null
           id: string
           notes: string | null
           payment_method: string
           payment_ref: string | null
           payment_status: string
           phone: string
+          picked_up_at: string | null
           status: string
           store_id: string
           subtotal: number
@@ -214,13 +241,16 @@ export type Database = {
           commission_amount?: number
           created_at?: string
           customer_id: string
+          delivered_at?: string | null
           delivery_fee?: number
+          driver_id?: string | null
           id?: string
           notes?: string | null
           payment_method?: string
           payment_ref?: string | null
           payment_status?: string
           phone: string
+          picked_up_at?: string | null
           status?: string
           store_id: string
           subtotal?: number
@@ -232,13 +262,16 @@ export type Database = {
           commission_amount?: number
           created_at?: string
           customer_id?: string
+          delivered_at?: string | null
           delivery_fee?: number
+          driver_id?: string | null
           id?: string
           notes?: string | null
           payment_method?: string
           payment_ref?: string | null
           payment_status?: string
           phone?: string
+          picked_up_at?: string | null
           status?: string
           store_id?: string
           subtotal?: number
@@ -528,6 +561,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_save_driver: {
+        Args: {
+          _active: boolean
+          _email: string
+          _full_name: string
+          _phone: string
+        }
+        Returns: string
+      }
+      driver_claim_order: { Args: { _order_id: string }; Returns: undefined }
+      driver_complete_order: { Args: { _order_id: string }; Returns: undefined }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -535,6 +579,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_driver: { Args: { _uid: string }; Returns: boolean }
       is_store_owner: { Args: { _store_id: string }; Returns: boolean }
       place_order: {
         Args: {
