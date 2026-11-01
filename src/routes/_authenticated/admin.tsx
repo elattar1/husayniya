@@ -1,5 +1,5 @@
 import type { SearchSchemaInput } from '@tanstack/react-router';
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { createFileRoute, useRouter, Link } from "@tanstack/react-router";
 import { ShieldCheck } from "lucide-react";
 import { Dashboard } from "@/components/dashboard/Dashboard";
 import { dashboardQuery } from "@/components/dashboard/queries";
@@ -17,7 +17,7 @@ export const Route = createFileRoute("/_authenticated/admin")({
 
 function Admin() {
   const search = Route.useSearch(), navigate = Route.useNavigate();
-  return <Dashboard admin search={search.q} tab={search.tab} onSearch={q => navigate({ search: prev => ({ ...prev, q }), replace: true })} onTab={tab => navigate({ search: prev => ({ ...prev, tab }) })} />;
+  return <><div className="mx-auto max-w-6xl px-4 pt-4"><Button asChild variant="outline"><Link to="/drivers">إدارة فريق الدليفري</Link></Button></div><Dashboard admin search={search.q} tab={search.tab} onSearch={q => navigate({ search: prev => ({ ...prev, q }), replace: true })} onTab={tab => navigate({ search: prev => ({ ...prev, tab }) })} /></>;
 }
 function AdminAccess({ message }: { message: string }) {
   const router = useRouter();

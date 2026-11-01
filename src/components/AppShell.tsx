@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Bell, Home, ShoppingCart, ClipboardList, Store, Shield, User } from "lucide-react";
+import { Bell, Home, ShoppingCart, ClipboardList, Store, Shield, User, Truck, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -31,18 +31,20 @@ export function AppShell({ children }: { children: ReactNode }) {
   const active = { className: "text-primary font-semibold" };
 
   return (
-    <div className="min-h-screen pb-20 md:pb-0">
+    <div className="min-h-screen pb-20 lg:pb-0">
       <header className="sticky top-0 z-40 border-b bg-card/90 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4">
           <Link to="/" className="flex items-center gap-2">
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-brand text-lg text-primary-foreground">ح</span>
             <span className="font-display text-lg text-primary">خدمات الحسينية</span>
           </Link>
-          <nav className="hidden items-center gap-5 text-sm md:flex">
+           <nav className="hidden items-center gap-3 text-sm lg:flex">
             <Link to="/" activeProps={active} activeOptions={{ exact: true }}>الرئيسية</Link>
             {user && <Link to="/orders" activeProps={active}>طلباتي</Link>}
             {user && <Link to="/provider" activeProps={active}>لوحة المحل</Link>}
             {isAdmin && <Link to="/admin" activeProps={active}>الإدارة</Link>}
+            {user && <Link to="/delivery" activeProps={active}>الدليفري</Link>}
+            {isAdmin && <Link to="/drivers" activeProps={active}>فريق الدليفري</Link>}
           </nav>
           <div className="flex items-center gap-1">
             {user && (
@@ -72,7 +74,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <main>{children}</main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex justify-around border-t bg-card py-2 md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 flex justify-around border-t bg-card py-2 lg:hidden">
         <Link to="/" className={navItem} activeProps={active} activeOptions={{ exact: true }}>
           <Home className="h-5 w-5" />الرئيسية
         </Link>
@@ -85,6 +87,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Link to="/provider" className={navItem} activeProps={active}>
           <Store className="h-5 w-5" />محلي
         </Link>
+        {user && <Link to="/delivery" className={navItem} activeProps={active}><Truck className="h-5 w-5" />الدليفري</Link>}
+        {isAdmin && <Link to="/drivers" className={navItem} activeProps={active}><Users className="h-5 w-5" />الفريق</Link>}
         {isAdmin && (
           <Link to="/admin" className={navItem} activeProps={active}>
             <Shield className="h-5 w-5" />الإدارة

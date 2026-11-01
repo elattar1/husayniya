@@ -1,0 +1,37 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { useState } from "react";
+import { Plus, Pencil, Phone, Users, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { PageTitle } from "@/components/AppShell";
+import { DeliveryError, DeliveryStat } from "@/components/DeliveryShared";
+import { driversQuery } from "@/lib/delivery-queries";
+import { saveDriver, setDriverActive } from "@/lib/delivery.functions";
+import { driverInput } from "@/lib/delivery-rules";
+import { pageMeta } from "@/lib/page-meta";
+import { money } from "@/lib/labels";
+
+export const Route = createFileRoute("/_authenticated/drivers")({
+  validateSearch: (s: Record<string, unknown>) => ({ q: typeof s["q"] === "string" ? s["q"] : "" }),
+  loader: ({ context }) => context.queryClient.ensureQueryData(driversQuery),
+  head: () => pageMeta("إدارة فريق الدليفري", "إضافة كباتن خدمات الحسينية وإدارة تفعيلهم ومتابعة توصيلاتهم وتحصيلاتهم"),
+  component: Drivers, errorComponent: DeliveryError, notFoundComponent: () => <p className="p-8">الصفحة غير موجودة</p>,
+});
+const emptyForm = { email: "", full_name: "", phone: "", is_active: true };
+function Drivers() {
+  const { data, isFetching } = useSuspenseQuery({ ...driversQuery, refetchInterval: 20_000 });
+  const qc = useQueryClient(), save = useServerFn(saveDriver), activate = useServerFn(setDriverActive);
+  const { q } = Route.useSearch(), navigate = Route.useNavigate();
+  const [open, setOpen] = useState(false), [editing, setEditing] = useState(false), [form, setForm] = useState(emptyForm), [error, setError] = useState("");
+  const refresh = () => Promise.all([qc.invalidateQueries({ queryKey: ["delivery-fleet"] }), qc.invalidateQueries({ queryKey: ["delivery-board"] })]);
+  const mutation = useMutation({ mutationFn: () => save({ data: driverInput.parse(form) }), onSuccess: async () => { setOpen(false); await refresh(); toast.success("تم حفظ بيانات الكابتن"); }, onError: (e) => setError(e.message) });
+  const toggle = useMutation({ mutationFn: (input: { user_id: string; is_active: boolean }) => activate({ data: input }), onSuccess: async () => { await refresh(); toast.success("تم تحديث حالة الكابتن"); }, onError: e => toast.error(e.message) });
+  const filtered = data.filter(d => `${d.full_name} ${d.phone} ${d.email}`.includes(q));
+  return <div className="mx-auto max-w-6xl px-4 py-7"><div className="flex flex-wrap items-start justify-between gap-3"><PageTitle title="فريق الدليفري" sub="كباتن خدمات الحسينية" /><div className="flex gap-2"><Button variant="outline" size="icon" aria-label="تحديث فريق الدليفري" title="تحديث فريق الدليفري" disabled={isFetching} onClick={refresh}><RefreshCw className={isFetching ? "animate-spin" : ""} /></Button><Button onClick={() => { setForm(emptyForm); setEditing(false); setError(""); setOpen(true); }}><Plus />إضافة كابتن</Button></div></div><Button asChild variant="link" className="mb-3 px-0"><Link to="/admin">العودة للإدارة</Link></Button><div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4"><DeliveryStat label="إجمالي الكباتن" value={data.length} /><DeliveryStat label="الكباتن النشطون" value={data.filter(d => d.is_active).length} /><DeliveryStat label="توصيلات جارية" value={data.reduce((s, d) => s + d.active, 0)} /><DeliveryStat label="النقد المحصّل" value={money(data.reduce((s, d) => s + d.cash, 0))} /></div><Input aria-label="البحث عن كابتن" placeholder="ابحث بالاسم أو الموبايل أو البريد" className="mb-6 max-w-md" value={q} onChange={e => navigate({ search: { q: e.target.value }, replace: true })} /><section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{filtered.map(d => <article key={d.user_id} className="min-w-0 rounded-lg border bg-card p-5"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="break-words text-lg">{d.full_name}</h2><p className="mt-1 break-all text-xs text-muted-foreground" dir="ltr">{d.email}</p></div><Button size="icon" variant="ghost" aria-label={`تعديل ${d.full_name}`} title="تعديل الكابتن" onClick={() => { setForm({ email: d.email, full_name: d.full_name, phone: d.phone, is_active: d.is_active }); setEditing(true); setError(""); setOpen(true); }}><Pencil /></Button></div><Button asChild variant="link" className="my-2 px-0"><a href={`tel:${d.phone}`}><Phone /><span dir="ltr">{d.phone}</span></a></Button><div className="grid grid-cols-2 gap-3 border-y py-3 text-sm"><p>جارية: <strong>{d.active}</strong></p><p>مكتملة: <strong>{d.delivered}</strong></p><p className="col-span-2">النقد المحصّل: <strong>{money(d.cash)}</strong></p></div><div className="mt-4 flex items-center justify-between"><Label htmlFor={`active-${d.user_id}`}>{d.is_active ? "نشط" : "موقوف"}</Label><Switch id={`active-${d.user_id}`} dir="ltr" checked={d.is_active} disabled={toggle.isPending} onCheckedChange={checked => toggle.mutate({ user_id: d.user_id, is_active: checked })} /></div></article>)}</section>{filtered.length === 0 && <div className="py-16 text-center text-muted-foreground"><Users className="mx-auto mb-3 size-10" /><p>{q ? "لا يوجد كابتن مطابق للبحث" : "لم تتم إضافة كباتن بعد"}</p></div>}<Dialog open={open} onOpenChange={v => { if (!mutation.isPending) setOpen(v); }}><DialogContent dir="rtl" className="max-w-[calc(100%-2rem)] sm:max-w-md"><DialogHeader><DialogTitle>{editing ? "تعديل بيانات الكابتن" : "إضافة كابتن"}</DialogTitle><DialogDescription>استخدم البريد الخاص بحساب الكابتن المسجل في التطبيق.</DialogDescription></DialogHeader><form className="space-y-4" onSubmit={e => { e.preventDefault(); setError(""); const parsed = driverInput.safeParse(form); if (!parsed.success) { setError(parsed.error.issues[0]?.message ?? "راجع البيانات"); return; } mutation.mutate(); }}><div className="space-y-2"><Label htmlFor="driver-email">البريد الإلكتروني</Label><Input id="driver-email" type="email" dir="ltr" required disabled={editing} value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div><div className="space-y-2"><Label htmlFor="driver-name">اسم الكابتن</Label><Input id="driver-name" required value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} /></div><div className="space-y-2"><Label htmlFor="driver-phone">رقم الموبايل</Label><Input id="driver-phone" type="tel" dir="ltr" required value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div><div className="flex justify-between"><Label htmlFor="driver-active">تفعيل الكابتن</Label><Switch id="driver-active" dir="ltr" checked={form.is_active} onCheckedChange={v => setForm({ ...form, is_active: v })} /></div>{error && <p role="alert" className="text-sm text-destructive">{error}</p>}<Button className="w-full" disabled={mutation.isPending} type="submit">{mutation.isPending ? "جارٍ الحفظ…" : "حفظ الكابتن"}</Button></form></DialogContent></Dialog></div>;
+}
