@@ -18,3 +18,4 @@
 
 - AI recommendations use authenticated server functions, streamed structured Responses calls, and server-side catalog-ID grounding; only active catalog stores in the selected area may appear.
 - Gateway provider denials persist in a service-role-only access-state table; recovery requires access restoration and explicit owner clearance before fresh requests.
+- Delivery and fleet management pages live under the authenticated layout and use existing delivery server functions; fleet mutations retain server-side admin checks and wallet totals remain accounting records.
