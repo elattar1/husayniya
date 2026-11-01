@@ -1,4 +1,5 @@
 # Provider and administration dashboards
+- [ ] Delivery captain page, fleet administration page, navigation, and authenticated verification.
 - [ ] Authenticated access and sign-in screen.
 - [ ] Provider store settings, products, and orders/bookings/service requests.
 - [ ] Admin approval, commission settings, order review, and earned commissions.
