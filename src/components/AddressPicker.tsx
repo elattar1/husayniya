@@ -8,7 +8,7 @@ type Saved = { id: string; label: string; phone: string; address: string; area_i
 type Area = { id: number; name: string };
 
 /** Renders form inputs named area / address / phone (+ label, save) so existing forms keep working. */
-export function AddressPicker({ areas, defaultArea, showArea = true }: { areas: Area[]; defaultArea?: number | null; showArea?: boolean }) {
+export function AddressPicker({ areas, defaultArea, showArea = true }: { areas: Area[]; defaultArea?: number | null | undefined; showArea?: boolean }) {
   const [saved, setSaved] = useState<Saved[] | null>(null);
   const [selected, setSelected] = useState<string>('new');
 
