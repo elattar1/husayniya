@@ -124,6 +124,47 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_addresses: {
+        Row: {
+          address: string
+          area_id: number | null
+          created_at: string
+          id: string
+          is_default: boolean
+          label: string
+          phone: string
+          user_id: string
+        }
+        Insert: {
+          address: string
+          area_id?: number | null
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          label?: string
+          phone: string
+          user_id?: string
+        }
+        Update: {
+          address?: string
+          area_id?: number | null
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          label?: string
+          phone?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_addresses_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "areas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       drivers: {
         Row: {
           created_at: string
