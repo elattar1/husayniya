@@ -13,7 +13,7 @@ export const getDriverBoard = createServerFn({ method: "POST" })
     if (me.error) throw new Error(me.error.message);
     if (!me.data || !me.data.is_active) return { driver: me.data, available: [], mine: [], areas: [] };
     const [available, mine, areas] = await Promise.all([
-      db.from("orders").select(orderSelect).is("driver_id", null).in("status", ["accepted", "preparing"]).order("created_at"),
+      db.from("orders").select(orderSelect).is("driver_id", null).eq("status", "preparing").order("created_at"),
       db.from("orders").select(orderSelect).eq("driver_id", context.userId).order("created_at", { ascending: false }).limit(200),
       db.from("areas").select("*"),
     ]);

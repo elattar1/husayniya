@@ -10,3 +10,8 @@ describe("Delivery wallet accounting", () => {
     ], new Date("2026-11-01T12:00:00Z"))).toEqual({ deliveredCount: 1, todayCount: 1, earnings: 20, todayEarnings: 20, cashCollected: 120 });
   });
 });
+import { allowedNext as storeNext } from "@/lib/dashboard-rules";
+describe("store order steps", () => {
+  it("store can move an accepted order to ready", () => { expect(storeNext("orders", "accepted")).toContain("preparing"); });
+  it("store cannot mark ready orders on the way or delivered", () => { expect(storeNext("orders", "preparing")).toEqual([]); expect(storeNext("orders", "on_the_way")).toEqual([]); });
+});

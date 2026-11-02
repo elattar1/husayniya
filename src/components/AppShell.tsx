@@ -23,7 +23,7 @@ function useUnread() {
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isDriver } = useAuth();
   const cart = useCart();
   const { data: unread = 0 } = useUnread();
 
@@ -43,7 +43,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             {user && <Link to="/orders" activeProps={active}>طلباتي</Link>}
             {user && <Link to="/provider" activeProps={active}>لوحة المحل</Link>}
             {isAdmin && <Link to="/admin" activeProps={active}>الإدارة</Link>}
-            {user && <Link to="/delivery" activeProps={active}>الدليفري</Link>}
+            {isDriver && <Link to="/delivery" activeProps={active}>الدليفري</Link>}
             {isAdmin && <Link to="/drivers" activeProps={active}>فريق الدليفري</Link>}
           </nav>
           <div className="flex items-center gap-1">
@@ -87,7 +87,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Link to="/provider" className={navItem} activeProps={active}>
           <Store className="h-5 w-5" />محلي
         </Link>
-        {user && <Link to="/delivery" className={navItem} activeProps={active}><Truck className="h-5 w-5" />الدليفري</Link>}
+        {isDriver && <Link to="/delivery" className={navItem} activeProps={active}><Truck className="h-5 w-5" />الدليفري</Link>}
         {isAdmin && <Link to="/drivers" className={navItem} activeProps={active}><Users className="h-5 w-5" />الفريق</Link>}
         {isAdmin && (
           <Link to="/admin" className={navItem} activeProps={active}>

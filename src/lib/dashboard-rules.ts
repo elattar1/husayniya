@@ -20,6 +20,8 @@ export const flows: Record<RequestKind, string[]> = {
   service_requests: ["pending", "accepted", "in_progress", "completed"],
 };
 export function allowedNext(kind: RequestKind, current: string) {
+  // Stores stop at "preparing" (ready); only the delivery captain moves orders on the way and delivered.
+  if (kind === "orders" && !["pending", "accepted"].includes(current)) return [];
   const flow = flows[kind];
   const index = flow.indexOf(current);
   if (index < 0 || index === flow.length - 1) return [];
