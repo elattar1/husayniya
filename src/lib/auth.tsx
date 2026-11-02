@@ -6,6 +6,7 @@ type AuthState = {
   user: User | null;
   loading: boolean;
   isAdmin: boolean;
+  isDriver: boolean;
   refreshRoles: () => Promise<void>;
 };
 
@@ -13,6 +14,7 @@ const AuthContext = createContext<AuthState>({
   user: null,
   loading: true,
   isAdmin: false,
+  isDriver: false,
   refreshRoles: async () => {},
 });
 
@@ -20,11 +22,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isDriver, setIsDriver] = useState(false);
 
   const loadRoles = async (u: User | null) => {
-    if (!u) return setIsAdmin(false);
-    const { data } = await supabase.from("user_roles").select("role").eq("user_id", u.id);
+    if (!u) { setIsAdmin(false); setIsDriver(false); return; }
+    const [{ data }, driver] = await Promise.all([
+      supabase.from("user_roles").select("role").eq("user_id", u.id),
+      supabase.from("drivers").select("is_active").eq("user_id", u.id).maybeSingle(),
+    ]);
     setIsAdmin(!!data?.some((r) => r.role === "admin"));
+    setIsDriver(!!driver.data?.is_active);
   };
 
   useEffect(() => {
@@ -42,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, isAdmin, refreshRoles: () => loadRoles(user) }}>
+    <AuthContext.Provider value={{ user, loading, isAdmin, isDriver, refreshRoles: () => loadRoles(user) }}>
       {children}
     </AuthContext.Provider>
   );

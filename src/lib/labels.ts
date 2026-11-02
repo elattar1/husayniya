@@ -1,7 +1,7 @@
 export const STATUS_LABELS: Record<string, string> = {
   pending: "قيد الانتظار",
   accepted: "تم القبول",
-  preparing: "جاري التجهيز",
+  preparing: "تم التجهيز",
   on_the_way: "في الطريق",
   delivered: "تم التوصيل",
   cancelled: "ملغي",

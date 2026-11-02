@@ -13,7 +13,7 @@ export const getDriverBoard = createServerFn({ method: "POST" })
     if (me.error) throw new Error(me.error.message);
     if (!me.data || !me.data.is_active) return { driver: me.data, available: [], mine: [], areas: [] };
     const [available, mine, areas] = await Promise.all([
-      db.from("orders").select(orderSelect).is("driver_id", null).in("status", ["accepted", "preparing"]).order("created_at"),
+      db.from("orders").select(orderSelect).is("driver_id", null).eq("status", "preparing").order("created_at"),
       db.from("orders").select(orderSelect).eq("driver_id", context.userId).order("created_at", { ascending: false }).limit(200),
       db.from("areas").select("*"),
     ]);
@@ -52,10 +52,13 @@ export const getDrivers = createServerFn({ method: "POST" }).middleware([require
     ]);
     if (drivers.error) throw new Error(drivers.error.message);
     if (orders.error) throw new Error(orders.error.message);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const users = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+    const emails = new Map((users.data?.users ?? []).map(u => [u.id, u.email ?? ""]));
     return (drivers.data ?? []).map(d => {
       const list = (orders.data ?? []).filter(o => o.driver_id === d.user_id);
       const done = list.filter(o => o.status === "delivered");
-      return { ...d, active: list.filter(o => o.status === "on_the_way").length, delivered: done.length, cash: done.reduce((s, o) => s + Number(o.total), 0) };
+      return { ...d, email: emails.get(d.user_id) ?? "", active: list.filter(o => o.status === "on_the_way").length, delivered: done.length, cash: done.reduce((s, o) => s + Number(o.total), 0) };
     });
   });
 
