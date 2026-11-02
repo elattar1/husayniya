@@ -56,7 +56,7 @@ export function AddressPicker({ areas, defaultArea, showArea = true }: { areas: 
 
 /** Save the address used in a submitted form (no-op if it already exists). */
 export async function rememberAddress(form: FormData) {
-  if (form.get('saved_address') && form.get('saved_address') !== 'on' && !form.has('address_label')) return;
+  if (!form.has('address_label')) return;
   const address = String(form.get('address') ?? '').trim();
   const phone = String(form.get('phone') ?? '').trim();
   if (address.length < 3 || phone.length < 6) return;
