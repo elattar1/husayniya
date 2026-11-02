@@ -17,7 +17,7 @@ export const Route = createFileRoute("/_authenticated/admin")({
 
 function Admin() {
   const search = Route.useSearch(), navigate = Route.useNavigate();
-  return <><div className="mx-auto max-w-6xl px-4 pt-4"><Button asChild variant="outline"><Link to="/drivers">إدارة فريق الدليفري</Link></Button></div><Dashboard admin search={search.q} tab={search.tab} onSearch={q => navigate({ search: prev => ({ ...prev, q }), replace: true })} onTab={tab => navigate({ search: prev => ({ ...prev, tab }) })} /></>;
+  return <><div className="mx-auto max-w-6xl px-4 pt-4"><Button asChild variant="outline"><Link to="/drivers" search={{ q: "" }}>إدارة فريق الدليفري</Link></Button></div><Dashboard admin search={search.q} tab={search.tab} onSearch={q => navigate({ search: prev => ({ ...prev, q }), replace: true })} onTab={tab => navigate({ search: prev => ({ ...prev, tab }) })} /></>;
 }
 function AdminAccess({ message }: { message: string }) {
   const router = useRouter();

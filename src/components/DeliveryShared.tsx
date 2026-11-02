@@ -1,8 +1,8 @@
-import { useRouter } from "@tanstack/react-router";
+import { useRouter, type ErrorComponentProps } from "@tanstack/react-router";
 import { Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export function DeliveryError({ error }: { error: Error }) {
+export function DeliveryError({ error }: ErrorComponentProps) {
   const router = useRouter();
   return <div role="alert" className="mx-auto max-w-xl space-y-4 px-4 py-16 text-center"><Truck className="mx-auto size-12 text-primary" /><h1 className="text-xl">تعذر فتح صفحة الدليفري</h1><p className="text-sm text-muted-foreground">{error.message}</p><Button onClick={() => router.invalidate()}>إعادة المحاولة</Button></div>;
 }
