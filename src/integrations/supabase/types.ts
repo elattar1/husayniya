@@ -508,6 +508,7 @@ export type Database = {
         Row: {
           address: string
           area_id: number | null
+          banner_url: string | null
           booking_fee: number
           category: string
           commission_rate: number
@@ -517,6 +518,7 @@ export type Database = {
           id: string
           is_active: boolean
           is_open: boolean
+          logo_url: string | null
           name: string
           owner_id: string | null
           phone: string | null
@@ -527,6 +529,7 @@ export type Database = {
         Insert: {
           address?: string
           area_id?: number | null
+          banner_url?: string | null
           booking_fee?: number
           category: string
           commission_rate?: number
@@ -536,6 +539,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_open?: boolean
+          logo_url?: string | null
           name: string
           owner_id?: string | null
           phone?: string | null
@@ -546,6 +550,7 @@ export type Database = {
         Update: {
           address?: string
           area_id?: number | null
+          banner_url?: string | null
           booking_fee?: number
           category?: string
           commission_rate?: number
@@ -555,6 +560,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_open?: boolean
+          logo_url?: string | null
           name?: string
           owner_id?: string | null
           phone?: string | null
