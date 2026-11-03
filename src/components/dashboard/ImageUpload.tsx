@@ -21,7 +21,7 @@ export async function uploadStoreImage(file: File) {
   return signed.data.signedUrl;
 }
 
-export function ImageUploadField({ label, name, value, wide = false }: { label: string; name: string; value?: string | null; wide?: boolean }) {
+export function ImageUploadField({ label, name, value, wide = false }: { label: string; name: string; value?: string | null | undefined; wide?: boolean }) {
   const [url, setUrl] = useState(value ?? "");
   const [busy, setBusy] = useState(false);
   async function pick(file?: File) {
