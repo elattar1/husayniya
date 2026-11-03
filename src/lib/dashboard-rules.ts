@@ -6,10 +6,12 @@ export const storeInput = z.object({
   description: z.string().max(2000), phone: z.string().trim().min(6).max(25),
   address: z.string().trim().min(3).max(500), specialty: z.string().max(200),
   delivery_fee: z.coerce.number().min(0), booking_fee: z.coerce.number().min(0), is_open: z.boolean(),
+  logo_url: z.string().trim().max(2000).refine(v => v === "" || v.startsWith("https://") || /^\/catalog\/[a-z]+\.jpg$/.test(v)).transform(v => v || null), banner_url: z.string().trim().max(2000).refine(v => v === "" || v.startsWith("https://") || /^\/catalog\/[a-z]+\.jpg$/.test(v)).transform(v => v || null),
 });
 export const productInput = z.object({
   id: z.string().uuid().optional(), store_id: z.string().uuid(), name: z.string().trim().min(2).max(160),
   description: z.string().max(2000), price: z.coerce.number().min(0), is_available: z.boolean(),
+  image_url: z.string().trim().max(2000).refine(v => v === "" || v.startsWith("https://") || /^\/catalog\/[a-z]+\.jpg$/.test(v)).transform(v => v || null), stock_qty: z.coerce.number().int().min(0).nullable(),
 });
 export const commissionInput = z.object({ id: z.string().uuid(), commission_rate: z.coerce.number().min(0).max(100), is_active: z.boolean() });
 export const requestKinds = ["orders", "bookings", "service_requests"] as const;
