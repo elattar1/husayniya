@@ -18,15 +18,40 @@ export const getDashboard = createServerFn({ method: "POST" })
     const stores = await storesQuery;
     if (stores.error) throw new Error(stores.error.message);
     const ids = (stores.data ?? []).map(s => s.id);
-    const [categories, areas, products, orders, bookings, services] = await Promise.all([
+    const [categories, areas, orders, bookings, services] = await Promise.all([
       db.from("categories").select("*").order("sort"), db.from("areas").select("*").order("id"),
-      db.from("products").select("*").in("store_id", ids).order("created_at", { ascending: false }),
-      db.from("orders").select("*, order_items(*)").in("store_id", ids).order("created_at", { ascending: false }),
+      db.from("orders").select("*").in("store_id", ids).order("created_at", { ascending: false }),
       db.from("bookings").select("*").in("store_id", ids).order("created_at", { ascending: false }),
       db.from("service_requests").select("*").in("store_id", ids).order("created_at", { ascending: false }),
     ]);
-    for (const result of [categories, areas, products, orders, bookings, services]) if (result.error) throw new Error(result.error.message);
-    return { stores: stores.data ?? [], categories: categories.data ?? [], areas: areas.data ?? [], products: products.data ?? [], orders: orders.data ?? [], bookings: bookings.data ?? [], services: services.data ?? [] };
+    for (const result of [categories, areas, orders, bookings, services]) if (result.error) throw new Error(result.error.message);
+    return { stores: stores.data ?? [], categories: categories.data ?? [], areas: areas.data ?? [], orders: orders.data ?? [], bookings: bookings.data ?? [], services: services.data ?? [] };
+  });
+
+export const getDashboardProducts = createServerFn({ method: 'POST' }).middleware([requireSupabaseAuth])
+  .inputValidator(z.object({ storeId: z.string().uuid() })).handler(async ({ context, data }) => {
+    const store = await context.supabase.from('stores').select('id').eq('id', data.storeId).eq('owner_id', context.userId).maybeSingle();
+    if (store.error || !store.data) throw new Error('لا تملك صلاحية عرض منتجات هذا المتجر');
+    const result = await context.supabase.from('products').select('*').eq('store_id', data.storeId).order('created_at', { ascending: false });
+    if (result.error) throw new Error(result.error.message);
+    return result.data ?? [];
+  });
+
+export const getDashboardOrderItems = createServerFn({ method: 'POST' }).middleware([requireSupabaseAuth])
+  .inputValidator(z.object({ orderId: z.string().uuid(), admin: z.boolean() })).handler(async ({ context, data }) => {
+    if (data.admin) {
+      const role = await context.supabase.rpc('has_role', { _user_id: context.userId, _role: 'admin' });
+      if (role.error || !role.data) throw new Error('هذه العملية مخصصة للإدارة فقط');
+    }
+    const order = await context.supabase.from('orders').select('store_id').eq('id', data.orderId).single();
+    if (order.error || !order.data) throw new Error('الطلب غير موجود');
+    if (!data.admin) {
+      const store = await context.supabase.from('stores').select('id').eq('id', order.data.store_id).eq('owner_id', context.userId).maybeSingle();
+      if (store.error || !store.data) throw new Error('لا تملك صلاحية عرض هذا الطلب');
+    }
+    const items = await context.supabase.from('order_items').select('name,qty,price').eq('order_id', data.orderId);
+    if (items.error) throw new Error(items.error.message);
+    return items.data ?? [];
   });
 
 export const saveStore = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])

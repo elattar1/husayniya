@@ -12,7 +12,7 @@ import hero from '@/assets/hero.jpg';
 import { ServiceRecommendations } from '@/components/ServiceRecommendations';
 export const Route = createFileRoute('/')({
   validateSearch: (s: SearchSchemaInput & { q?: unknown; category?: unknown; area?: unknown }) => ({ q: typeof s.q === 'string' ? s.q : '', category: typeof s.category === 'string' ? s.category : '', area: typeof s.area === 'string' ? s.area : '' }),
-  loader: ({ context }) => context.queryClient.ensureQueryData(catalogQuery),
+  loader: ({ context }) => context.queryClient.ensureQueryData({ ...catalogQuery, revalidateIfStale: true }),
   head: () => pageMeta('المتاجر والخدمات في الحسينية', 'ابحث عن متاجر الحسينية والمطاعم والأطباء والخدمات المنزلية، واطلب وتابع طلبك من مكان واحد'),
   component: Browse, errorComponent: CustomerError, notFoundComponent: CustomerNotFound,
 });
