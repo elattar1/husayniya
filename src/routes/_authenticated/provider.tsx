@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_authenticated/provider")({
   validateSearch: (s: SearchSchemaInput & { q?: unknown; tab?: unknown }) => ({ q: typeof s.q === "string" ? s.q : "", tab: ["stores", "products", "orders", "earnings"].includes(String(s.tab)) ? String(s.tab) : "stores" }),
-  loader: ({ context }) => context.queryClient.ensureQueryData(dashboardQuery(false)),
+  loader: ({ context }) => context.queryClient.ensureQueryData({ ...dashboardQuery(false), revalidateIfStale: true }),
   head: () => pageMeta("لوحة مقدم الخدمة", "إدارة المتجر والمنتجات والطلبات والحجوزات ومستحقات مقدم الخدمة في خدمات الحسينية"),
   component: Provider,
   errorComponent: ({ error }) => <DashboardError message={error instanceof Error ? error.message : "تعذر تحميل البيانات"} />,

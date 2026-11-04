@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   validateSearch: (s: SearchSchemaInput & { q?: unknown; tab?: unknown }) => ({ q: typeof s.q === "string" ? s.q : "", tab: ["stores", "orders", "earnings"].includes(String(s.tab)) ? String(s.tab) : "stores" }),
-  loader: ({ context }) => context.queryClient.ensureQueryData(dashboardQuery(true)),
+  loader: ({ context }) => context.queryClient.ensureQueryData({ ...dashboardQuery(true), revalidateIfStale: true }),
   head: () => pageMeta("لوحة الإدارة", "اعتماد المتاجر وضبط العمولات ومراجعة الطلبات والأرباح في خدمات الحسينية"),
   component: Admin,
   errorComponent: ({ error }) => <AdminAccess message={error instanceof Error ? error.message : "تعذر تحميل البيانات"} />,
