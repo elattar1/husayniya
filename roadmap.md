@@ -1,7 +1,7 @@
 # Navigation performance
-- [ ] Reduce public catalog payload and load only the selected store's products/reviews.
-- [ ] Defer dashboard products, enable intent preloading, and refresh cached data in the background.
-- [ ] Test cache behavior and verify signed-in navigation on mobile and desktop.
+- [x] Reduce public catalog payload and load only the selected store's products/reviews.
+- [x] Defer dashboard products, enable intent preloading, and refresh cached data in the background.
+- [x] Test cache behavior and verify signed-in navigation on mobile and desktop.
 
 # Provider and administration dashboards
 - [ ] Delivery captain page, fleet administration page, navigation, and authenticated verification.
