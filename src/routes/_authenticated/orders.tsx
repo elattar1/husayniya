@@ -16,7 +16,7 @@ import { pageMeta } from '@/lib/page-meta';
 import { CustomerError, CustomerNotFound } from '@/components/CustomerFeedback';
 export const Route = createFileRoute('/_authenticated/orders')({
   validateSearch: (s: SearchSchemaInput & { filter?: unknown }) => ({ filter: ['all','active','completed','cancelled'].includes(String(s.filter)) ? String(s.filter) : 'all' }),
-  loader: async ({ context }) => { await Promise.all([context.queryClient.ensureQueryData(customerOrdersQuery), context.queryClient.ensureQueryData(catalogQuery)]); },
+  loader: async ({ context }) => { await Promise.all([context.queryClient.ensureQueryData(customerOrdersQuery), context.queryClient.ensureQueryData({ ...catalogQuery, revalidateIfStale: true })]); },
   head: () => pageMeta('طلباتي وحجوزاتي', 'متابعة الطلبات وحجوزات الأطباء والخدمات المنزلية في خدمات الحسينية'),
   component: Orders, errorComponent: CustomerError, notFoundComponent: CustomerNotFound,
 });

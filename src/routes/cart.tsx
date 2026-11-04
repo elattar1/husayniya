@@ -14,7 +14,7 @@ import { placeCustomerOrder } from '@/lib/customer.functions';
 import { money } from '@/lib/labels';
 import { pageMeta } from '@/lib/page-meta';
 import { CustomerError, CustomerNotFound } from '@/components/CustomerFeedback';
-export const Route = createFileRoute('/cart')({ loader: ({ context }) => context.queryClient.ensureQueryData(catalogQuery), head: () => pageMeta('سلة المشتريات', 'مراجعة المشتريات وتحديد العنوان وإرسال طلبك إلى متاجر الحسينية'), component: Cart, errorComponent: CustomerError, notFoundComponent: CustomerNotFound });
+export const Route = createFileRoute('/cart')({ loader: ({ context }) => context.queryClient.ensureQueryData({ ...catalogQuery, revalidateIfStale: true }), head: () => pageMeta('سلة المشتريات', 'مراجعة المشتريات وتحديد العنوان وإرسال طلبك إلى متاجر الحسينية'), component: Cart, errorComponent: CustomerError, notFoundComponent: CustomerNotFound });
 function Cart() {
   const cart = useCart();
   useSuspenseQuery(catalogQuery);

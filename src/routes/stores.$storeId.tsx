@@ -16,8 +16,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { TIME_SLOTS, CATEGORY_ICONS, money } from '@/lib/labels';
 import { CustomerError, CustomerNotFound } from '@/components/CustomerFeedback';
 export const Route = createFileRoute('/stores/$storeId')({
-  loader: async ({ params, context }) => { const data = await context.queryClient.ensureQueryData(catalogQuery); if (!data.stores.some(s => s.id === params.storeId)) throw notFound(); await context.queryClient.ensureQueryData(storeDetailsQuery(params.storeId)); return data; },
-  head: ({ loaderData, params }) => { const s = loaderData?.stores.find(s => s.id === params.storeId); return pageMeta(s?.name ?? 'متجر غير متاح', s?.description || 'منتجات وحجز مواعيد وطلب خدمات في الحسينية'); },
+  loader: async ({ params, context }) => { const data = await context.queryClient.ensureQueryData({ ...catalogQuery, revalidateIfStale: true }); if (!data.stores.some(s => s.id === params.storeId)) throw notFound(); await context.queryClient.ensureQueryData({ ...storeDetailsQuery(params.storeId), revalidateIfStale: true }); return data; },
+  head: ({ loaderData, params }) => { const s = loaderData?.stores.find(s => s.id === params.storeId); const meta = pageMeta(s?.name ?? 'متجر غير متاح', s?.description || 'منتجات وحجز مواعيد وطلب خدمات في الحسينية'); if (s?.banner_url?.startsWith('https://')) meta.meta.push({ property: 'og:image', content: s.banner_url }, { name: 'twitter:image', content: s.banner_url }); return meta; },
   component: StorePage, errorComponent: CustomerError, notFoundComponent: CustomerNotFound,
 });
 function StorePage() {
