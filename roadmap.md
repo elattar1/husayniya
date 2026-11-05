@@ -1,6 +1,7 @@
 # Mobile push notifications
 - [x] Connect Firebase Messaging with web push enabled.
-- [ ] Add authenticated device registration and a test notification in «طلباتي», and verify on a real phone.
+- [x] Add authenticated device registration and a test notification in «طلباتي».
+- [ ] Verify real phone receipt after publishing and granting notification permission on that phone (requires user action).
 - [ ] Register authenticated customer devices and deliver order updates in the background.
 - [ ] Verify permission handling, delivery rules, and real phone delivery.
 

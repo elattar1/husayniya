@@ -17,14 +17,21 @@ export function PushNotificationControls() {
     setBusy(true); setMessage(''); setNewTab(false);
     try {
       const { enablePush } = await import('@/lib/push-browser');
-      const result = await enablePush();
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const result = await Promise.race([
+        enablePush(),
+        new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('لم يكتمل اتصال إشعارات هذا الجهاز؛ تحقق من الإنترنت وافتح التطبيق المنشور في متصفحك ثم أعد المحاولة.')), 25000); }),
+      ]).finally(() => { if (timer) clearTimeout(timer); });
       if (result.status === 'registered') {
         await register({ data: { token: result.token } }); setToken(result.token); setMessage('تم تفعيل إشعارات هذا الجهاز.');
       } else {
         setNewTab(result.status === 'open-in-new-tab');
         setMessage({ 'not-configured': 'حدّث ربط Firebase واختر Include web push.', unsupported: 'هذا المتصفح لا يدعم الإشعارات؛ على آيفون أضف التطبيق للشاشة الرئيسية ثم افتحه منها.', 'open-in-new-tab': 'افتح التطبيق في تبويب مستقل أو استخدم التطبيق المنشور لتفعيل الإشعارات.', denied: 'الإشعارات غير مسموحة؛ فعّلها من إعدادات الموقع في متصفحك ثم حاول مرة أخرى.' }[result.status]);
       }
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'تعذر تفعيل الإشعارات'); }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : '';
+      setMessage(/permission|denied/i.test(detail) ? 'المتصفح رفض تسجيل الإشعارات؛ فعّل السماح بها من إعدادات الموقع وافتح التطبيق المنشور ثم أعد المحاولة.' : detail || 'تعذر تفعيل الإشعارات');
+    }
     finally { setBusy(false); }
   }
   async function test() {
