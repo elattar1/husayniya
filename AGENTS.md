@@ -20,3 +20,4 @@
 - Gateway provider denials persist in a service-role-only access-state table; recovery requires access restoration and explicit owner clearance before fresh requests.
 - Delivery and fleet management pages live under the authenticated layout and use existing delivery server functions; fleet mutations retain server-side admin checks and wallet totals remain accounting records.
 - Navigation uses intent preloading and cached dashboard reads with background revalidation; public catalog lists exclude products/reviews, while store details, provider products, and order items use separate scoped queries to keep opening pages lightweight without truncating the earnings ledger.
+- Web push uses a dedicated Firebase messaging worker without app-shell caching; authenticated registration and test sends target only the caller's stored device token through the connector gateway.
