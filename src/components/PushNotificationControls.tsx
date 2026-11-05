@@ -17,7 +17,11 @@ export function PushNotificationControls() {
     setBusy(true); setMessage(''); setNewTab(false);
     try {
       const { enablePush } = await import('@/lib/push-browser');
-      const result = await enablePush();
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const result = await Promise.race([
+        enablePush(),
+        new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('لم يكتمل اتصال إشعارات هذا الجهاز؛ تحقق من الإنترنت وافتح التطبيق المنشور في متصفحك ثم أعد المحاولة.')), 25000); }),
+      ]).finally(() => { if (timer) clearTimeout(timer); });
       if (result.status === 'registered') {
         await register({ data: { token: result.token } }); setToken(result.token); setMessage('تم تفعيل إشعارات هذا الجهاز.');
       } else {
