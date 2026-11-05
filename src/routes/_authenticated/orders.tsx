@@ -14,6 +14,7 @@ import { flows, type RequestKind } from '@/lib/dashboard-rules';
 import { dateAr, money, STATUS_LABELS } from '@/lib/labels';
 import { pageMeta } from '@/lib/page-meta';
 import { CustomerError, CustomerNotFound } from '@/components/CustomerFeedback';
+import { PushNotificationControls } from '@/components/PushNotificationControls';
 export const Route = createFileRoute('/_authenticated/orders')({
   validateSearch: (s: SearchSchemaInput & { filter?: unknown }) => ({ filter: ['all','active','completed','cancelled'].includes(String(s.filter)) ? String(s.filter) : 'all' }),
   loader: async ({ context }) => { await Promise.all([context.queryClient.ensureQueryData(customerOrdersQuery), context.queryClient.ensureQueryData({ ...catalogQuery, revalidateIfStale: true })]); },
