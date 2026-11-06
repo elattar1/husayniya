@@ -1,7 +1,7 @@
 import type { SearchSchemaInput } from '@tanstack/react-router';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, MapPin, ArrowLeft, Star, Clock3, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { pageMeta } from '@/lib/page-meta';
@@ -10,6 +10,7 @@ import { CATEGORY_ICONS, money } from '@/lib/labels';
 import { CustomerError, CustomerNotFound } from '@/components/CustomerFeedback';
 import hero from '@/assets/hero.jpg';
 import { ServiceRecommendations } from '@/components/ServiceRecommendations';
+import { useAuth } from '@/lib/auth';
 
 export const Route = createFileRoute('/')({
   validateSearch: (s: SearchSchemaInput & { q?: unknown; category?: unknown; area?: unknown }) => ({
@@ -32,6 +33,18 @@ function Browse() {
   const { data } = useSuspenseQuery(catalogQuery);
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
+  const { appMode } = useAuth();
+
+  // إذا كان المستخدم في وضع متخصص (إدارة، تاجر، سائق)، يتم فتح اللوحة المخصصة له تلقائيًا
+  useEffect(() => {
+    if (appMode === 'admin') {
+      navigate({ to: '/admin', replace: true });
+    } else if (appMode === 'merchant') {
+      navigate({ to: '/provider', search: { tab: 'orders' }, replace: true });
+    } else if (appMode === 'driver') {
+      navigate({ to: '/delivery', search: { tab: 'available' }, replace: true });
+    }
+  }, [appMode, navigate]);
 
   // إدارة الفئة المحددة محليًا لمنع قفز الشاشة للأعلى عند التبديل
   const [selectedCategory, setSelectedCategory] = useState<string>(

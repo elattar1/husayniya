@@ -19,6 +19,9 @@ import {
   Shield,
   FileText,
   X,
+  ShoppingBag,
+  ArrowRightLeft,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -63,9 +66,26 @@ const STATUS_CONFIG = {
 };
 
 function AccountPage() {
-  const { user, isAdmin, isDriver, isProvider } = useAuth();
+  const { user, isAdmin, isDriver, isProvider, appMode, setAppMode } = useAuth();
   const client = useQueryClient();
   const navigate = useNavigate();
+
+  const handleSwitchMode = (mode: "customer" | "merchant" | "driver" | "admin") => {
+    setAppMode(mode);
+    if (mode === "customer") {
+      toast.success("تم التحويل لوضع المشتري بنجاح");
+      navigate({ to: "/" });
+    } else if (mode === "admin") {
+      toast.success("تم التحويل لوضع الإدارة");
+      navigate({ to: "/admin" });
+    } else if (mode === "merchant") {
+      toast.success("تم التحويل لبوابة التاجر");
+      navigate({ to: "/provider", search: { tab: "orders" } });
+    } else if (mode === "driver") {
+      toast.success("تم التحويل لتطبيق السائق");
+      navigate({ to: "/delivery", search: { tab: "available" } });
+    }
+  };
 
   // Modals state
   const [complaintsOpen, setComplaintsOpen] = useState(false);
@@ -319,13 +339,20 @@ function AccountPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 md:py-12">
       {/* رأس الصفحة */}
-      <div className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b pb-5">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b pb-5">
         <div className="flex items-center gap-3">
-          <div className="grid size-14 place-items-center rounded-2xl bg-primary text-primary-foreground font-bold text-xl">
+          <div className="grid size-14 place-items-center rounded-2xl bg-primary text-primary-foreground font-bold text-xl shadow-soft">
             {fullName ? fullName.slice(0, 1) : user.email?.slice(0, 1).toUpperCase()}
           </div>
           <div>
-            <h1 className="text-2xl font-bold">{fullName || "حسابي"}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold">{fullName || "حسابي"}</h1>
+              {appMode !== "customer" && (
+                <span className="rounded-full bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 text-xs font-semibold">
+                  {appMode === "admin" ? "وضع الإدارة" : appMode === "merchant" ? "بوابة التاجر" : "تطبيق السائق"}
+                </span>
+              )}
+            </div>
             <p className="text-sm text-muted-foreground" dir="ltr">
               {user.email}
             </p>
@@ -333,24 +360,187 @@ function AccountPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {isAdmin && (
-            <Button variant="default" asChild>
-              <Link to="/admin">
-                <Shield className="ml-1.5 size-4" />
-                لوحة الإدارة
-              </Link>
-            </Button>
-          )}
-          {(isProvider || isAdmin) && (
-            <Button variant="outline" asChild>
-              <Link to="/provider">
-                <Store className="ml-1.5 size-4" />
-                لوحة المتجر
-              </Link>
+          {appMode !== "customer" && (
+            <Button variant="default" onClick={() => handleSwitchMode("customer")} className="gap-1.5 font-bold shadow-sm">
+              <ShoppingBag className="size-4" />
+              التحويل لوضع المشتري
             </Button>
           )}
         </div>
       </div>
+
+      {/* بنر الوضع النشط إن وجد مع زر الرجوع السريع لوضع المشتري */}
+      {appMode !== "customer" && (
+        <div className="mb-6 rounded-2xl border-2 border-primary/30 bg-primary/10 p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm animate-in fade-in duration-300">
+          <div className="flex items-center gap-3">
+            <div className="grid size-12 place-items-center rounded-xl bg-primary text-primary-foreground shrink-0 shadow-soft">
+              {appMode === "admin" && <Shield className="size-6" />}
+              {appMode === "merchant" && <Store className="size-6" />}
+              {appMode === "driver" && <Truck className="size-6" />}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="inline-block size-2 rounded-full bg-emerald-500 animate-pulse" />
+                <h2 className="text-base font-bold">
+                  أنت تعمل حالياً في {appMode === "admin" ? "لوحة الإدارة السحابية" : appMode === "merchant" ? "بوابة التاجر والمحل" : "تطبيق السائق والدليفري"}
+                </h2>
+              </div>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                الشريط السفلي مخصص لهذا الوضع تلقائياً، والموقع يفتح دائماً على لوحتك لحين العودة لوضع المشتري.
+              </p>
+            </div>
+          </div>
+          <Button
+            onClick={() => handleSwitchMode("customer")}
+            size="lg"
+            className="w-full sm:w-auto font-bold shadow-md gap-2"
+          >
+            <ShoppingBag className="size-4" />
+            التحويل لوضع المشتري (تصفح المتجر)
+          </Button>
+        </div>
+      )}
+
+      {/* قسم أوضاع المنظومة ولوحات التحكم (يظهر فقط للحسابات المصرح لها: إدارة، تجار، سائقين) */}
+      {(isAdmin || isProvider || isDriver) && (
+        <section className="mb-8 rounded-2xl border bg-card p-5 sm:p-6 shadow-soft">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <Sparkles className="size-5 text-primary" />
+                لوحات التحكم وأوضاع المنظومة
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                اضغط على أي وضع للتحويل إليه فوراً وتخصيص شريط التنقل السفلي الخاص به
+              </p>
+            </div>
+            {appMode !== "customer" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleSwitchMode("customer")}
+                className="gap-1.5 text-xs"
+              >
+                <ArrowRightLeft className="size-3.5" />
+                تفعيل وضع المشتري
+              </Button>
+            )}
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {/* بطاقة الإدارة */}
+            {isAdmin && (
+              <div className={`relative flex flex-col justify-between rounded-xl border p-4 transition-all ${
+                appMode === "admin" ? "border-purple-500 bg-purple-500/10 shadow-sm" : "border-border hover:border-purple-500/40 bg-card"
+              }`}>
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="grid size-10 place-items-center rounded-lg bg-purple-600/15 text-purple-600 dark:text-purple-300">
+                      <Shield className="size-5" />
+                    </div>
+                    {appMode === "admin" ? (
+                      <span className="rounded-full bg-purple-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                        الوضع النشط
+                      </span>
+                    ) : (
+                      <span className="text-[11px] font-medium text-muted-foreground">مدير التطبيق</span>
+                    )}
+                  </div>
+                  <h3 className="font-bold text-base">لوحة الإدارة السحابية</h3>
+                  <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                    اعتماد المتاجر والخدمات، نقل الملكيات، تقارير الأرباح والخزينة، ومتابعة فريق الدليفري.
+                  </p>
+                </div>
+                <div className="mt-4 pt-3 border-t">
+                  {appMode === "admin" ? (
+                    <Button variant="outline" className="w-full text-xs font-semibold" onClick={() => navigate({ to: "/admin" })}>
+                      فتح اللوحة الآن
+                    </Button>
+                  ) : (
+                    <Button className="w-full text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white" onClick={() => handleSwitchMode("admin")}>
+                      التحويل لوضع الإدارة
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* بطاقة التاجر */}
+            {(isProvider || isAdmin) && (
+              <div className={`relative flex flex-col justify-between rounded-xl border p-4 transition-all ${
+                appMode === "merchant" ? "border-amber-500 bg-amber-500/10 shadow-sm" : "border-border hover:border-amber-500/40 bg-card"
+              }`}>
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="grid size-10 place-items-center rounded-lg bg-amber-600/15 text-amber-600 dark:text-amber-300">
+                      <Store className="size-5" />
+                    </div>
+                    {appMode === "merchant" ? (
+                      <span className="rounded-full bg-amber-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                        الوضع النشط
+                      </span>
+                    ) : (
+                      <span className="text-[11px] font-medium text-muted-foreground">لوحة المتجر</span>
+                    )}
+                  </div>
+                  <h3 className="font-bold text-base">بوابة التاجر والمحل</h3>
+                  <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                    استقبال ومتابعة الطلبات، إدارة قائمة المنتجات والأسعار، وتحديث بيانات ومواعيد المحل.
+                  </p>
+                </div>
+                <div className="mt-4 pt-3 border-t">
+                  {appMode === "merchant" ? (
+                    <Button variant="outline" className="w-full text-xs font-semibold" onClick={() => navigate({ to: "/provider", search: { tab: "orders" } })}>
+                      فتح البوابة الآن
+                    </Button>
+                  ) : (
+                    <Button className="w-full text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white" onClick={() => handleSwitchMode("merchant")}>
+                      التحويل لبوابة التاجر
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* بطاقة السائق */}
+            {(isDriver || isAdmin) && (
+              <div className={`relative flex flex-col justify-between rounded-xl border p-4 transition-all ${
+                appMode === "driver" ? "border-emerald-500 bg-emerald-500/10 shadow-sm" : "border-border hover:border-emerald-500/40 bg-card"
+              }`}>
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="grid size-10 place-items-center rounded-lg bg-emerald-600/15 text-emerald-600 dark:text-emerald-300">
+                      <Truck className="size-5" />
+                    </div>
+                    {appMode === "driver" ? (
+                      <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                        الوضع النشط
+                      </span>
+                    ) : (
+                      <span className="text-[11px] font-medium text-muted-foreground">كابتن التوصيل</span>
+                    )}
+                  </div>
+                  <h3 className="font-bold text-base">تطبيق السائق والدليفري</h3>
+                  <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                    رادار الطلبات المتاحة، شاشة التوصيل الحالية، تتبع العنوان والعميل، وحساب المحفظة.
+                  </p>
+                </div>
+                <div className="mt-4 pt-3 border-t">
+                  {appMode === "driver" ? (
+                    <Button variant="outline" className="w-full text-xs font-semibold" onClick={() => navigate({ to: "/delivery", search: { tab: "available" } })}>
+                      فتح تطبيق السائق
+                    </Button>
+                  ) : (
+                    <Button className="w-full text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => handleSwitchMode("driver")}>
+                      التحويل لتطبيق السائق
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       <div className="grid gap-6 md:grid-cols-3">
         {/* العمود الأيمن: تعديل العنوان ورقم التليفون */}

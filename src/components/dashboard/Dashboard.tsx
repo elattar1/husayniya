@@ -151,6 +151,33 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
   const editedStore = storeEdit && storeEdit !== "new" ? storeEdit : undefined;
   const editedProduct = productEdit && productEdit !== "new" ? productEdit : undefined;
 
+  function toggleStoreOpen() {
+    if (!store) return;
+    execute(
+      () =>
+        doSaveStore({
+          data: {
+            id: store.id,
+            name: store.name,
+            category: store.category,
+            area_id: store.area_id,
+            description: store.description,
+            phone: store.phone ?? "",
+            address: store.address ?? "",
+            specialty: store.specialty ?? "",
+            delivery_fee: store.delivery_fee,
+            booking_fee: store.booking_fee,
+            is_open: !store.is_open,
+            logo_url: store.logo_url ?? "",
+            banner_url: store.banner_url ?? "",
+          },
+        }),
+      () => {
+        toast.success(!store.is_open ? "المتجر مفتوح الآن وجاهز لاستقبال الطلبات!" : "تم إغلاق المتجر مؤقتًا أمام الطلبات الجديدة");
+      },
+    );
+  }
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-7 md:px-6 md:py-10">
       <div className="mb-7 flex flex-wrap items-start justify-between gap-4">
@@ -197,9 +224,25 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
               </p>
             </div>
           </div>
-          <Button variant="outline" onClick={() => setStoreEdit(store)}>
-            <Pencil /> بيانات المتجر
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              onClick={toggleStoreOpen}
+              className={`text-xs gap-1.5 font-medium ${
+                store.is_open
+                  ? "border-emerald-500/40 text-emerald-600 bg-emerald-500/10 hover:bg-emerald-500/20"
+                  : "border-destructive/40 text-destructive bg-destructive/10 hover:bg-destructive/20"
+              }`}
+            >
+              <span className={`size-2 rounded-full ${store.is_open ? "bg-emerald-500 animate-pulse" : "bg-destructive"}`} />
+              {store.is_open ? "المتجر مفتوح للطلبات" : "المتجر مغلق حاليًا"}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setStoreEdit(store)} className="gap-1.5 text-xs">
+              <Pencil className="size-3.5" /> بيانات المتجر
+            </Button>
+          </div>
         </div>
       )}
 
