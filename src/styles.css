@@ -123,21 +123,13 @@
   box-shadow: var(--shadow-glass);
 }
 
-/* نمط الليكويد جلاس الشفاف النقي مثل نظام iOS / آيفون */
-@utility liquid-glass-container {
-  background-color: rgb(255 255 255 / 0.18);
-  border-color: rgb(255 255 255 / 0.4);
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
-  box-shadow: inset 0 1.5px 1.5px 0 rgb(255 255 255 / 0.75), 0 14px 44px -8px rgb(0 0 0 / 0.4);
-}
-
-@utility liquid-glass-item {
-  background-color: rgb(255 255 255 / 0.22);
-  border-color: rgb(255 255 255 / 0.35);
-  backdrop-filter: blur(20px) saturate(150%);
-  -webkit-backdrop-filter: blur(20px) saturate(150%);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.6);
+/* نمط الليكويد جلاس المستطيل بشفافية موزونة وأناقة فائقة */
+@utility liquid-glass-rect {
+  background-color: rgb(255 255 255 / 0.32);
+  border-color: rgb(255 255 255 / 0.45);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.65), 0 8px 24px -6px rgb(0 0 0 / 0.25);
 }
 
 @layer components {
@@ -152,8 +144,7 @@
 }
 
 @supports not (backdrop-filter: blur(1px)) {
-  .glass-surface, .bg-card { background-color: var(--popover); }
-  .liquid-glass-container, .liquid-glass-item {
+  .glass-surface, .bg-card, .liquid-glass-rect {
     background-color: var(--popover);
     border-color: var(--border);
   }
