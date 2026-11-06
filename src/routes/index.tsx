@@ -1,9 +1,8 @@
 import type { SearchSchemaInput } from '@tanstack/react-router';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { Search, MapPin, ArrowLeft, Star, Clock3 } from 'lucide-react';
+import { Search, MapPin, ArrowLeft, Star, Clock3, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { pageMeta } from '@/lib/page-meta';
 import { catalogQuery } from '@/lib/customer-queries';
 import { CATEGORY_ICONS, money } from '@/lib/labels';
@@ -52,35 +51,67 @@ function Browse() {
         />
         <div className="absolute inset-0 -z-10 bg-hero-overlay" />
         <div className="mx-auto max-w-6xl px-4 py-12 text-primary-foreground md:py-16">
-          <p className="mb-3 flex items-center gap-2 text-sm">
-            <MapPin size={16} /> الحسينية، الشرقية
+          <p className="mb-3 flex items-center gap-2 text-sm font-medium text-white/90 drop-shadow-sm">
+            <MapPin size={16} className="text-white" /> الحسينية، الشرقية
           </p>
-          <h1 className="text-3xl md:text-4xl">خدمات الحسينية</h1>
-          <p className="mb-8 mt-4 text-lg">متاجر بلدك وخدماتها، أقرب إليك.</p>
-          <div className="flex max-w-3xl flex-col gap-3 sm:flex-row">
-            <div className="relative flex-1">
-              <Search className="absolute right-3 top-3 size-5 text-muted-foreground" />
-              <Input
-                className="h-12 bg-card pr-10 text-foreground"
-                aria-label="البحث عن خدمة أو متجر"
-                placeholder="مطعم، صيدلية، طبيب أو خدمة..."
-                value={search.q}
-                onChange={(e) => update({ q: e.target.value })}
-              />
+          <h1 className="text-3xl font-extrabold tracking-tight text-white drop-shadow-md md:text-5xl">
+            خدمات الحسينية
+          </h1>
+          <p className="mb-8 mt-3 text-lg text-white/90 drop-shadow-sm max-w-xl">
+            متاجر بلدك وخدماتها، أقرب إليك.
+          </p>
+
+          {/* حاوية الليكويد جلاس الفاخرة لخانة البحث والمنطقة مثل نظام iOS والآيفون */}
+          <div className="liquid-glass-container relative max-w-3xl rounded-3xl p-2.5 md:p-3 border transition-all">
+            {/* لمعة زجاجية سائلة علوية */}
+            <div className="pointer-events-none absolute inset-0 rounded-3xl bg-gradient-to-b from-white/25 via-white/5 to-transparent opacity-90" />
+
+            <div className="relative flex flex-col gap-2.5 sm:flex-row sm:items-center">
+              {/* حقل البحث بالزجاج السائل */}
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 size-5 text-white/85" />
+                <input
+                  type="text"
+                  className="liquid-glass-item h-12 w-full rounded-2xl border pr-12 pl-10 text-base font-medium text-white placeholder:text-white/75 focus:outline-none focus:ring-2 focus:ring-white/70 focus:bg-white/30 transition-all shadow-sm"
+                  aria-label="البحث عن خدمة أو متجر"
+                  placeholder="ابحث عن مطعم، صيدلية، طبيب، سباك أو متجر..."
+                  value={search.q}
+                  onChange={(e) => update({ q: e.target.value })}
+                />
+                {search.q && (
+                  <button
+                    type="button"
+                    onClick={() => update({ q: '' })}
+                    className="absolute left-3.5 top-1/2 -translate-y-1/2 rounded-full size-6 grid place-items-center text-white/80 hover:text-white hover:bg-white/25 transition-all"
+                    title="مسح البحث"
+                    aria-label="مسح البحث"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              {/* اختيار المنطقة بالزجاج السائل الفاخر */}
+              <div className="relative sm:w-56">
+                <MapPin className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 size-4 text-white/85" />
+                <select
+                  aria-label="المنطقة"
+                  className="liquid-glass-item h-12 w-full appearance-none rounded-2xl border pr-11 pl-9 text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-white/70 focus:bg-white/30 transition-all cursor-pointer shadow-sm"
+                  value={search.area}
+                  onChange={(e) => update({ area: e.target.value })}
+                >
+                  <option value="" className="bg-slate-900 text-white font-medium">كل المناطق في الحسينية</option>
+                  {data.areas.map((a) => (
+                    <option key={a.id} value={a.id} className="bg-slate-900 text-white font-medium">
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/80 text-xs">
+                  ▼
+                </div>
+              </div>
             </div>
-            <select
-              aria-label="المنطقة"
-              className="h-12 rounded-md border bg-card px-4 text-foreground sm:w-52"
-              value={search.area}
-              onChange={(e) => update({ area: e.target.value })}
-            >
-              <option value="">كل المناطق</option>
-              {data.areas.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
           </div>
         </div>
       </section>
