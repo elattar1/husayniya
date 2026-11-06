@@ -23,7 +23,7 @@ function useUnread() {
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { user, isAdmin, isDriver } = useAuth();
+  const { user, isAdmin, isDriver, isProvider } = useAuth();
   const cart = useCart();
   const { data: unread = 0 } = useUnread();
 
@@ -41,7 +41,7 @@ export function AppShell({ children }: { children: ReactNode }) {
            <nav className="hidden items-center gap-3 text-sm lg:flex">
             <Link to="/" activeProps={active} activeOptions={{ exact: true }}>الرئيسية</Link>
             {user && <Link to="/orders" activeProps={active}>طلباتي</Link>}
-            {user && <Link to="/provider" activeProps={active}>لوحة المحل</Link>}
+            {(isProvider || isAdmin) && <Link to="/provider" activeProps={active}>لوحة المحل</Link>}
             {isAdmin && <Link to="/admin" activeProps={active}>الإدارة</Link>}
             {isDriver && <Link to="/delivery" search={{ tab: "available" }} activeProps={active}>الدليفري</Link>}
             {isAdmin && <Link to="/drivers" search={{ q: "" }} activeProps={active}>فريق الدليفري</Link>}

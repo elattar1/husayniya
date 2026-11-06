@@ -63,7 +63,7 @@ const STATUS_CONFIG = {
 };
 
 function AccountPage() {
-  const { user, isAdmin, isDriver } = useAuth();
+  const { user, isAdmin, isDriver, isProvider } = useAuth();
   const client = useQueryClient();
   const navigate = useNavigate();
 
@@ -341,12 +341,14 @@ function AccountPage() {
               </Link>
             </Button>
           )}
-          <Button variant="outline" asChild>
-            <Link to="/provider">
-              <Store className="ml-1.5 size-4" />
-              لوحة المتجر
-            </Link>
-          </Button>
+          {(isProvider || isAdmin) && (
+            <Button variant="outline" asChild>
+              <Link to="/provider">
+                <Store className="ml-1.5 size-4" />
+                لوحة المتجر
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
 
