@@ -35,7 +35,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <header className="glass-surface sticky top-0 z-40 border-b">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4">
           <Link to="/" className="flex items-center gap-2">
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-brand text-lg text-primary-foreground">ح</span>
+            <img src="/icon-512.png" alt="" className="h-10 w-10 rounded-xl object-cover" />
             <span className="font-display text-lg text-primary">خدمات الحسينية</span>
           </Link>
            <nav className="hidden items-center gap-3 text-sm lg:flex">
