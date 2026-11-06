@@ -12,6 +12,7 @@ import {
 } from "./dashboard-rules";
 import { CATALOG_GROUPS, catalogItem, catalogImage } from "./supermarket-catalog";
 import { suggestedSectionsFor } from "./product-sections";
+import { REAL_STORES, REAL_SECTIONS, REAL_PRODUCTS } from "./real-stores-data";
 
 export const getDashboard = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -26,7 +27,16 @@ export const getDashboard = createServerFn({ method: "POST" })
     if (!data.admin) storesQuery = storesQuery.eq("owner_id", context.userId);
     const stores = await storesQuery;
     if (stores.error) throw new Error(stores.error.message);
-    const ids = (stores.data ?? []).map(s => s.id);
+    
+    // Filter out dummy demo stores and merge real stores for admin
+    const rawStores = (stores.data ?? []).filter(s => !s.name.includes('(تجريبي)'));
+    const storeMap = new Map();
+    if (data.admin) {
+      REAL_STORES.forEach(s => storeMap.set(s.id, { ...s, owner_id: context.userId, created_at: new Date().toISOString() }));
+    }
+    rawStores.forEach(s => storeMap.set(s.id, s));
+    const mergedStores = Array.from(storeMap.values());
+    const ids = mergedStores.map(s => s.id);
     const [categories, areas, orders, bookings, services] = await Promise.all([
       db.from("categories").select("*").order("sort"),
       db.from("areas").select("*").order("id"),
@@ -38,7 +48,7 @@ export const getDashboard = createServerFn({ method: "POST" })
       if (result.error) throw new Error(result.error.message);
     }
     return {
-      stores: stores.data ?? [],
+      stores: mergedStores,
       categories: categories.data ?? [],
       areas: areas.data ?? [],
       orders: orders.data ?? [],
@@ -51,33 +61,43 @@ export const getDashboardProducts = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(z.object({ storeId: z.string().uuid() }))
   .handler(async ({ context, data }) => {
-    const store = await context.supabase
-      .from("stores")
-      .select("id")
-      .eq("id", data.storeId)
-      .eq("owner_id", context.userId)
-      .maybeSingle();
-    if (store.error || !store.data) throw new Error("لا تملك صلاحية عرض منتجات هذا المتجر");
+    const roleCheck = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
+    const isAdmin = !!roleCheck.data;
+    if (!isAdmin) {
+      const store = await context.supabase
+        .from("stores")
+        .select("id")
+        .eq("id", data.storeId)
+        .eq("owner_id", context.userId)
+        .maybeSingle();
+      if (store.error || !store.data) throw new Error("لا تملك صلاحية عرض منتجات هذا المتجر");
+    }
     const result = await context.supabase
       .from("products")
       .select("*")
       .eq("store_id", data.storeId)
       .order("created_at", { ascending: false });
     if (result.error) throw new Error(result.error.message);
-    return result.data ?? [];
+    const dbProds = result.data ?? [];
+    if (dbProds.length > 0) return dbProds;
+    return REAL_PRODUCTS.filter(p => p.store_id === data.storeId) as any;
   });
 
 export const getDashboardSections = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(z.object({ storeId: z.string().uuid() }))
   .handler(async ({ context, data }) => {
-    const store = await context.supabase
-      .from("stores")
-      .select("id")
-      .eq("id", data.storeId)
-      .eq("owner_id", context.userId)
-      .maybeSingle();
-    if (store.error || !store.data) throw new Error("لا تملك صلاحية عرض أقسام هذا المتجر");
+    const roleCheck = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
+    const isAdmin = !!roleCheck.data;
+    if (!isAdmin) {
+      const store = await context.supabase
+        .from("stores")
+        .select("id")
+        .eq("id", data.storeId)
+        .eq("owner_id", context.userId)
+        .maybeSingle();
+      if (store.error || !store.data) throw new Error("لا تملك صلاحية عرض أقسام هذا المتجر");
+    }
     const result = await context.supabase
       .from("store_sections")
       .select("id,store_id,name,sort_order,created_at")
@@ -85,7 +105,9 @@ export const getDashboardSections = createServerFn({ method: "POST" })
       .order("sort_order")
       .order("name");
     if (result.error) throw new Error(result.error.message);
-    return result.data ?? [];
+    const dbSecs = result.data ?? [];
+    if (dbSecs.length > 0) return dbSecs;
+    return REAL_SECTIONS.filter(s => s.store_id === data.storeId) as any;
   });
 
 export const getDashboardOrderItems = createServerFn({ method: "POST" })
