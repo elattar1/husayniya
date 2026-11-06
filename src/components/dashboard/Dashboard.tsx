@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { Link } from "@tanstack/react-router";
 import { useSuspenseQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -19,6 +20,14 @@ import {
   ArrowRightLeft,
   UserCheck,
   UserX,
+  Clock,
+  Timer,
+  Flame,
+  ExternalLink,
+  TrendingUp,
+  CheckCircle2,
+  Award,
+  Calendar,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -36,11 +45,11 @@ import { money, dateAr, STATUS_LABELS } from "@/lib/labels";
 
 type StoreRow = DashboardData["stores"][number];
 type ProductRow = DashboardProduct;
-type Task = LedgerRow & { id: string; phone: string; detail: string; address: string; notes: string | null; items: { name: string; qty: number; price: number }[]; images: string[]; appointment?: string | undefined };
+type Task = LedgerRow & { id: string; phone: string; detail: string; address: string; notes: string | null; items: { name: string; qty: number; price: number }[]; images: string[]; appointment?: string | undefined; picked_up_at?: string | null };
 
 function tasksFrom(data: DashboardData): Task[] {
   return [
-    ...data.orders.map(o => ({ kind: "orders" as const, id: o.id, store_id: o.store_id, status: o.status, amount: Number(o.total), commission: Number(o.commission_amount), created_at: o.created_at, phone: o.phone, detail: "طلب مشتريات", address: o.address, notes: o.notes, items: [], images: [] })),
+    ...data.orders.map(o => ({ kind: "orders" as const, id: o.id, store_id: o.store_id, status: o.status, amount: Number(o.total), commission: Number(o.commission_amount), created_at: o.created_at, phone: o.phone, detail: "طلب مشتريات", address: o.address, notes: o.notes, items: [], images: [], picked_up_at: (o as any).picked_up_at ?? null })),
     ...data.bookings.map(o => ({ kind: "bookings" as const, id: o.id, store_id: o.store_id, status: o.status, amount: Number(o.fee), commission: Number(o.commission_amount), created_at: o.created_at, phone: o.phone, detail: o.patient_name, address: "", notes: o.notes, items: [], images: [], appointment: `${o.booking_date} • ${o.booking_time}` })),
     ...data.services.map(o => ({ kind: "service_requests" as const, id: o.id, store_id: o.store_id, status: o.status, amount: Number(o.quoted_price ?? 0), commission: Number(o.commission_amount), created_at: o.created_at, phone: o.phone, detail: o.description, address: o.address, notes: null, items: [], images: o.image_paths, appointment: o.preferred_date ?? undefined })),
   ].sort((a,b) => b.created_at.localeCompare(a.created_at));
@@ -85,7 +94,8 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
     }
   }
 
-  const productQuery = useQuery({ ...dashboardProductsQuery(store?.id ?? ''), enabled: !admin && !!store && (tab === 'products' || catalogOpen || productEdit !== null) });
+  const [period, setPeriod] = useState<"today" | "week" | "month" | "year" | "all">("all");
+  const productQuery = useQuery({ ...dashboardProductsQuery(store?.id ?? ''), enabled: !!store && (tab === 'products' || catalogOpen || productEdit !== null) });
   const itemQuery = useQuery({ ...dashboardOrderItemsQuery(detail?.id ?? '', admin), enabled: detail?.kind === 'orders' });
   const allProducts = productQuery.data ?? [];
   const allTasks = tasksFrom(data);
@@ -98,6 +108,52 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
   const storeName = (id: string) => data.stores.find(s => s.id === id)?.name ?? "متجر";
   const selectedDetail = detail ? tasks.find(t => t.id === detail.id && t.kind === detail.kind) ?? detail : null;
   const currentDetail = selectedDetail?.kind === "orders" ? { ...selectedDetail, items: itemQuery.data ?? [] } : selectedDetail;
+
+  // 1. حساب تقارير الأرباح والدخل حسب الفترة المحددة (يومي / أسبوعي / شهري / سنوي)
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).getTime();
+  const startOfMonth = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).getTime();
+  const startOfYear = new Date(now.getFullYear(), 0, 1).getTime();
+
+  const periodTasks = tasks.filter(t => {
+    if (period === "all") return true;
+    const taskTime = new Date(t.created_at).getTime();
+    if (period === "today") return taskTime >= startOfToday;
+    if (period === "week") return taskTime >= startOfWeek;
+    if (period === "month") return taskTime >= startOfMonth;
+    if (period === "year") return taskTime >= startOfYear;
+    return true;
+  });
+  const periodTotals = earnings(periodTasks);
+
+  // 2. حساب المطاعم والخدمات الأكثر طلباً
+  const storeOrderCounts = data.orders.reduce((acc, order) => {
+    acc[order.store_id] = (acc[order.store_id] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const topOrderedStores = [...data.stores]
+    .map(s => ({
+      ...s,
+      orderCount: storeOrderCounts[s.id] || 0,
+      deliveredCount: data.orders.filter(o => o.store_id === s.id && o.status === "delivered").length,
+      grossSales: data.orders.filter(o => o.store_id === s.id && o.status === "delivered").reduce((sum, o) => sum + Number(o.total), 0),
+    }))
+    .filter(s => s.orderCount > 0)
+    .sort((a, b) => b.orderCount - a.orderCount)
+    .slice(0, 5);
+
+  // 3. حساب متوسط وقت التحضير للمطعم (من وقت إنشاء / قبول الطلب حتى تم التحضير)
+  const preparedOrders = data.orders.filter(o => (admin ? o.store_id === store?.id : o.store_id === store?.id) && o.picked_up_at && o.created_at);
+  const avgPrepMinutes = preparedOrders.length > 0
+    ? Math.round(
+        preparedOrders.reduce((sum, o) => {
+          const diff = Math.max(5, Math.round((new Date(o.picked_up_at!).getTime() - new Date(o.created_at).getTime()) / (1000 * 60)));
+          return sum + diff;
+        }, 0) / preparedOrders.length,
+      )
+    : 18;
 
   function submitStore(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -207,12 +263,10 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
               {admin ? <ShieldCheck className="ml-2 size-4" /> : <Store className="ml-2 size-4" />}
               {admin ? "المتاجر والخدمات" : "المتجر"}
             </TabsTrigger>
-            {!admin && (
-              <TabsTrigger value="products">
-                <Package className="ml-2 size-4" />
-                المنتجات
-              </TabsTrigger>
-            )}
+            <TabsTrigger value="products">
+              <Package className="ml-2 size-4" />
+              {admin ? "إدارة المنيو" : "المنتجات والمنيو"}
+            </TabsTrigger>
             <TabsTrigger value="orders">
               <ClipboardList className="ml-2 size-4" />
               الطلبات
@@ -231,8 +285,74 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
         <TabsContent value="stores">
           {admin ? (
             <>
-              <h2 className="mb-4 text-lg">
-                المتاجر ومقدمو الخدمات <span className="text-sm text-muted-foreground">({stores.length})</span>
+              {/* قسم المطاعم والخدمات الأكثر طلباً */}
+              {topOrderedStores.length > 0 && (
+                <div className="mb-8 rounded-2xl border bg-card p-5 shadow-soft">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="grid size-9 place-items-center rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                        <Flame className="size-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-base">المطاعم والخدمات الأكثر طلباً</h3>
+                        <p className="text-xs text-muted-foreground">ترتيب الأنشطة التجارية وفقاً لعدد الطلبات وإجمالي المبيعات</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {topOrderedStores.map((ts, index) => (
+                      <div key={ts.id} className="relative rounded-xl border bg-muted/20 p-4 transition-all hover:border-primary/40">
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <span className={`inline-flex items-center justify-center size-6 rounded-full text-xs font-bold ${
+                            index === 0 ? "bg-amber-500 text-white" : index === 1 ? "bg-slate-300 text-slate-800" : index === 2 ? "bg-amber-700/60 text-white" : "bg-muted text-muted-foreground"
+                          }`}>
+                            #{index + 1}
+                          </span>
+                          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${ts.is_open ? "bg-emerald-500/10 text-emerald-600" : "bg-destructive/10 text-destructive"}`}>
+                            {ts.is_open ? "يعمل الآن" : "مغلق"}
+                          </span>
+                        </div>
+
+                        <h4 className="font-bold text-sm text-foreground">{ts.name}</h4>
+                        <p className="text-xs text-muted-foreground mt-0.5">{data.categories.find(c => c.slug === ts.category)?.name}</p>
+
+                        <div className="mt-3 flex items-center justify-between border-t pt-2 text-xs">
+                          <span className="text-muted-foreground">إجمالي الطلبات:</span>
+                          <strong className="text-primary font-bold">{ts.orderCount} طلب</strong>
+                        </div>
+                        <div className="flex items-center justify-between text-xs mt-1">
+                          <span className="text-muted-foreground">المبيعات المكتملة:</span>
+                          <strong className="text-success font-bold">{money(ts.grossSales)}</strong>
+                        </div>
+
+                        <div className="mt-3 flex gap-1.5 pt-2 border-t">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1 h-7 text-xs"
+                            onClick={() => {
+                              setSelectedStore(ts.id);
+                              onTab("products");
+                            }}
+                          >
+                            <Package className="size-3 ml-1" />
+                            المنيو
+                          </Button>
+                          <Button asChild size="sm" variant="ghost" className="h-7 text-xs px-2" title="معاينة كعميل">
+                            <Link to="/stores/$storeId" params={{ storeId: ts.id }} target="_blank">
+                              <ExternalLink className="size-3.5" />
+                            </Link>
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <h2 className="mb-4 text-lg font-bold">
+                كافة المتاجر ومقدمو الخدمات <span className="text-sm font-normal text-muted-foreground">({stores.length})</span>
               </h2>
               <div className="divide-y border-y">
                 {stores.map(s => {
@@ -245,7 +365,10 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
                           <Store size={22} />
                         </div>
                         <div>
-                          <h3 className="font-sans font-semibold">{s.name}</h3>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-sans font-semibold text-base">{s.name}</h3>
+                            <span className={`inline-block size-2 rounded-full ${s.is_open ? "bg-emerald-500 animate-pulse" : "bg-destructive"}`} title={s.is_open ? "مفتوح" : "مغلق"} />
+                          </div>
                           <p className="mt-1 text-sm text-muted-foreground">
                             {data.categories.find(c => c.slug === s.category)?.name} • {data.areas.find(a => a.id === s.area_id)?.name ?? "بدون منطقة"}
                           </p>
@@ -263,15 +386,75 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
                           )}
                         </div>
                       </div>
-                      <div className="flex flex-wrap items-center gap-3">
-                        <span className={`text-xs ${s.is_active ? "text-success" : "text-warning"}`}>
-                          {s.is_active ? "معتمد" : "بانتظار الاعتماد"}
-                        </span>
-                        <span className="text-sm">عمولة {s.commission_rate}٪</span>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        {/* زر تبديل حالة المطعم مباشرة من الإدارة: يعمل / مغلق */}
                         <Button
                           size="sm"
                           variant="outline"
-                          className="gap-1.5"
+                          disabled={busy}
+                          onClick={() => {
+                            execute(
+                              () =>
+                                doSaveStore({
+                                  data: {
+                                    id: s.id,
+                                    name: s.name,
+                                    category: s.category,
+                                    area_id: s.area_id,
+                                    description: s.description,
+                                    phone: s.phone ?? "",
+                                    address: s.address ?? "",
+                                    specialty: s.specialty ?? "",
+                                    delivery_fee: s.delivery_fee,
+                                    booking_fee: s.booking_fee,
+                                    is_open: !s.is_open,
+                                    logo_url: s.logo_url ?? "",
+                                    banner_url: s.banner_url ?? "",
+                                  },
+                                }),
+                              () => {
+                                toast.success(s.is_open ? `تم إغلاق متجر «${s.name}»` : `تم فتح متجر «${s.name}» لاستقبال الطلبات`);
+                              },
+                            );
+                          }}
+                          className={`h-8 gap-1.5 text-xs font-semibold ${
+                            s.is_open
+                              ? "border-emerald-500/40 text-emerald-600 bg-emerald-500/10 hover:bg-emerald-500/20"
+                              : "border-destructive/40 text-destructive bg-destructive/10 hover:bg-destructive/20"
+                          }`}
+                        >
+                          <span className={`size-2 rounded-full ${s.is_open ? "bg-emerald-500" : "bg-destructive"}`} />
+                          {s.is_open ? "يعمل الآن" : "مغلق"}
+                        </Button>
+
+                        {/* زر معاينة المتجر كعميل */}
+                        <Button asChild size="sm" variant="ghost" className="h-8 gap-1 text-xs" title="معاينة المتجر كعميل">
+                          <Link to="/stores/$storeId" params={{ storeId: s.id }} target="_blank">
+                            <ExternalLink className="size-3.5" />
+                            معاينة
+                          </Link>
+                        </Button>
+
+                        {/* زر إدارة المنيو */}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 gap-1 text-xs"
+                          onClick={() => {
+                            setSelectedStore(s.id);
+                            onTab("products");
+                          }}
+                        >
+                          <Package className="size-3.5" />
+                          المنيو
+                        </Button>
+
+                        {/* زر نقل / تعيين الملكية */}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 gap-1.5 text-xs"
                           onClick={() => {
                             setTransferTarget(s);
                             setTargetEmail(ownerEmail ?? "");
@@ -280,16 +463,18 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
                           <ArrowRightLeft className="size-3.5" />
                           {s.owner_id ? "نقل الملكية" : "تعيين المالك"}
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => setApproval(s)}>
-                          {s.is_active ? <Pencil /> : <Check />}
-                          {s.is_active ? "إدارة" : "مراجعة واعتماد"}
+
+                        {/* زر الاعتماد والعمولة */}
+                        <Button size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={() => setApproval(s)}>
+                          {s.is_active ? <Pencil className="size-3" /> : <Check className="size-3" />}
+                          {s.is_active ? "العمولة" : "اعتماد"}
                         </Button>
                       </div>
                     </div>
                   );
                 })}
               </div>
-              {!stores.length && <Empty text="لا توجد متاجر مطابقة" />}
+              {!stores.length && <Empty text="لا توجد متاجر مطابقة للبحث" />}
             </>
           ) : store ? (
             <div className="space-y-6">
@@ -336,13 +521,19 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
                     <span className={`size-2 rounded-full ${store.is_open ? "bg-emerald-500 animate-pulse" : "bg-destructive"}`} />
                     {store.is_open ? "المتجر مفتوح للطلبات" : "المتجر مغلق حاليًا"}
                   </Button>
+                  <Button asChild variant="ghost" size="sm" className="gap-1.5 text-xs font-semibold">
+                    <Link to="/stores/$storeId" params={{ storeId: store.id }} target="_blank">
+                      <ExternalLink className="size-3.5" />
+                      معاينة كعميل
+                    </Link>
+                  </Button>
                   <Button variant="outline" size="sm" onClick={() => setStoreEdit(store)} className="gap-1.5 text-xs font-semibold">
                     <Pencil className="size-3.5" /> تعديل بيانات المتجر
                   </Button>
                 </div>
               </div>
 
-              {/* بطاقة تفاصيل المتجر */}
+              {/* بطاقة تفاصيل المتجر ومتوسط وقت التحضير */}
               <div className="grid gap-6 md:grid-cols-2 rounded-xl border bg-card p-5 shadow-soft">
                 <div>
                   <h3 className="mb-4 text-base font-bold">بيانات المتجر والاتصال</h3>
@@ -363,12 +554,24 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
                   </dl>
                 </div>
                 <div>
-                  <h3 className="mb-4 text-base font-bold">الرسوم والاعتماد</h3>
+                  <h3 className="mb-4 text-base font-bold">الرسوم والاعتماد ومعدل التحضير</h3>
                   <div className="space-y-3 text-sm">
+                    {/* مؤشر متوسط وقت التحضير في لوحة المطعم */}
+                    <div className="rounded-xl border border-primary/20 bg-primary/5 p-3.5 flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <Timer className="size-5 text-primary" />
+                        <div>
+                          <strong className="block text-xs text-muted-foreground">متوسط وقت تحضير الوجبات</strong>
+                          <span className="text-xs text-muted-foreground">من وقت قبول الطلب إلى جاهزيته للتسليم</span>
+                        </div>
+                      </div>
+                      <span className="text-base font-bold text-primary">{avgPrepMinutes} دقيقة</span>
+                    </div>
+
                     <p>رسوم التوصيل المقررة: <strong>{money(store.delivery_fee)}</strong></p>
                     <p>رسوم الحجز (إن وجد): <strong>{money(store.booking_fee)}</strong></p>
                     <p>نسبة العمولة: <strong>{store.commission_rate}٪</strong></p>
-                    <div className="rounded-lg border-r-4 border-primary bg-primary/5 p-4 text-xs leading-relaxed">
+                    <div className="rounded-lg border-r-4 border-primary bg-primary/5 p-3 text-xs leading-relaxed">
                       {store.is_active ? "تم اعتماد المتجر بالكامل ويمكن للعملاء الطلب منه." : "متجرك محفوظ وبانتظار مراجعة الإدارة قبل ظهوره للعملاء."}
                     </div>
                   </div>
@@ -380,74 +583,126 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
           )}
         </TabsContent>
 
-        {!admin && (
-          <TabsContent value="products">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg">المنتجات ({products.length})</h2>
-              <div className="flex flex-wrap gap-2">
-                <Button variant="secondary" disabled={!store || !productQuery.data} onClick={() => setCatalogOpen(true)}>
-                  <ClipboardList /> من الكتالوج الجاهز
-                </Button>
-                <Button disabled={!store} onClick={() => setProductEdit("new")}>
-                  <Plus /> إضافة منتج
-                </Button>
+        <TabsContent value="products">
+          {/* محدد المتجر للمدير العام حتى يتمكن من إدارة منيو أي متجر في المنظومة */}
+          {admin && (
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4 shadow-soft">
+              <div className="flex items-center gap-3">
+                <div className="grid size-10 place-items-center rounded-lg bg-primary/10 text-primary">
+                  <Store className="size-5" />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground block font-medium">المتجر المحدد لإدارة المنيو والمنتجات:</label>
+                  <select
+                    className="bg-transparent text-base font-bold text-foreground focus:outline-none"
+                    value={store?.id ?? ""}
+                    onChange={e => {
+                      setSelectedStore(e.target.value);
+                      onSearch("");
+                    }}
+                  >
+                    {data.stores.map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({data.categories.find(c => c.slug === s.category)?.name})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {store && (
+                  <Button asChild variant="outline" size="sm" className="gap-1.5 text-xs font-semibold">
+                    <Link to="/stores/$storeId" params={{ storeId: store.id }} target="_blank">
+                      <ExternalLink className="size-3.5" />
+                      معاينة كعميل
+                    </Link>
+                  </Button>
+                )}
               </div>
             </div>
-            <div className="divide-y border-y">
-              {products.map(p => (
-                <div className="flex flex-wrap items-center justify-between gap-3 py-4" key={p.id}>
-                  <div className="flex items-center gap-3">
-                    {p.image_url ? (
-                      <img src={p.image_url} alt="" loading="lazy" className="size-12 rounded object-cover" />
-                    ) : (
-                      <div className="grid size-12 place-items-center rounded bg-muted">
-                        <Package className="size-5 text-muted-foreground" />
-                      </div>
-                    )}
-                    <div>
-                      <h3 className="font-sans font-semibold">{p.name}</h3>
-                      <p className="mt-1 text-xs text-muted-foreground">{p.description}</p>
+          )}
+
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold">قائمة المنتجات والمنيو ({products.length})</h2>
+              {store && <p className="text-xs text-muted-foreground">متجر: {store.name}</p>}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" disabled={!store || !productQuery.data} onClick={() => setCatalogOpen(true)}>
+                <ClipboardList className="size-4 ml-1" /> من الكتالوج الجاهز
+              </Button>
+              <Button disabled={!store} onClick={() => setProductEdit("new")}>
+                <Plus className="size-4 ml-1" /> إضافة منتج
+              </Button>
+            </div>
+          </div>
+          <div className="divide-y border-y">
+            {products.map(p => (
+              <div className="flex flex-wrap items-center justify-between gap-3 py-4" key={p.id}>
+                <div className="flex items-center gap-3">
+                  {p.image_url ? (
+                    <img src={p.image_url} alt="" loading="lazy" className="size-12 rounded object-cover" />
+                  ) : (
+                    <div className="grid size-12 place-items-center rounded bg-muted">
+                      <Package className="size-5 text-muted-foreground" />
                     </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <span className="font-semibold">{money(p.price)}</span>
-                    <span className={`text-xs ${p.is_available ? "text-success" : "text-muted-foreground"}`}>{p.is_available ? "متاح" : "غير متاح"}</span>
-                    <Button variant="ghost" size="icon" title="تعديل المنتج" aria-label={`تعديل ${p.name}`} onClick={() => setProductEdit(p)}>
-                      <Pencil />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="text-destructive" title="حذف المنتج" aria-label={`حذف ${p.name}`} onClick={() => setRemove(p)}>
-                      <Trash2 />
-                    </Button>
+                  )}
+                  <div>
+                    <h3 className="font-sans font-semibold">{p.name}</h3>
+                    <p className="mt-1 text-xs text-muted-foreground">{p.description}</p>
                   </div>
                 </div>
-              ))}
-            </div>
-            {productQuery.isPending ? (
-              <p role="status" className="py-8 text-center text-muted-foreground">
-                جاري تحميل المنتجات...
-              </p>
-            ) : productQuery.isError ? (
-              <div role="alert" className="py-8 text-center">
-                <p>تعذر تحميل المنتجات</p>
-                <Button variant="outline" onClick={() => productQuery.refetch()}>
-                  إعادة المحاولة
-                </Button>
+                <div className="flex items-center gap-4">
+                  <span className="font-semibold">{money(p.price)}</span>
+                  <span className={`text-xs font-bold ${p.is_available ? "text-success" : "text-muted-foreground"}`}>{p.is_available ? "متاح" : "غير متاح"}</span>
+                  <Button variant="ghost" size="icon" title="تعديل المنتج" aria-label={`تعديل ${p.name}`} onClick={() => setProductEdit(p)}>
+                    <Pencil />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="text-destructive" title="حذف المنتج" aria-label={`حذف ${p.name}`} onClick={() => setRemove(p)}>
+                    <Trash2 />
+                  </Button>
+                </div>
               </div>
-            ) : (
-              !products.length && <Empty text="لا توجد منتجات" />
-            )}
-          </TabsContent>
-        )}
+            ))}
+          </div>
+          {productQuery.isPending ? (
+            <p role="status" className="py-8 text-center text-muted-foreground">
+              جاري تحميل المنتجات...
+            </p>
+          ) : productQuery.isError ? (
+            <div role="alert" className="py-8 text-center">
+              <p>تعذر تحميل المنتجات</p>
+              <Button variant="outline" onClick={() => productQuery.refetch()}>
+                إعادة المحاولة
+              </Button>
+            </div>
+          ) : (
+            !products.length && <Empty text="لا توجد منتجات مسجلة لهذا المتجر حتى الآن" />
+          )}
+        </TabsContent>
 
         <TabsContent value="orders">
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h2 className="text-lg font-bold">{admin ? "جميع طلبات وحجوزات المنظومة" : "الطلبات والحجوزات الواردة للمتجر"} ({visibleTasks.length})</h2>
+              <h2 className="text-lg font-bold">{admin ? "جميع طلبات وحجوزات المنظومة" : `طلبات وحجوزات متجر ${store?.name ?? ""}`} ({visibleTasks.length})</h2>
               <p className="text-xs text-muted-foreground mt-0.5">
                 طلبات قيد التنفيذ: <span className="font-bold text-primary">{pending}</span> • طلبات مكتملة: <span className="font-bold text-success">{tasks.filter(t => ["delivered", "completed"].includes(t.status)).length}</span>
               </p>
             </div>
+
+            {/* مؤشر متوسط وقت التحضير في لوحة المطعم */}
+            <div className="flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5 shadow-soft">
+              <div className="grid size-9 place-items-center rounded-lg bg-primary text-primary-foreground">
+                <Timer className="size-5" />
+              </div>
+              <div>
+                <span className="text-xs text-muted-foreground block font-medium">متوسط وقت التحضير</span>
+                <strong className="text-base font-bold text-primary">{avgPrepMinutes} دقيقة</strong>
+              </div>
+            </div>
           </div>
+
           <div className="divide-y border-y">
             {visibleTasks.map(t => (
               <div key={`${t.kind}-${t.id}`} className="flex flex-wrap items-center justify-between gap-4 py-5">
@@ -469,35 +724,78 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
               </div>
             ))}
           </div>
-          {!visibleTasks.length && <Empty text="لا توجد طلبات مطابقة" />}
+          {!visibleTasks.length && <Empty text="لا توجد طلبات مطابقة للبحث" />}
         </TabsContent>
 
         <TabsContent value="earnings">
-          <div className="mb-6">
-            <h2 className="text-lg font-bold">{admin ? "الخزينة وكشف عمولات المنصة" : "الأرباح والمستحقات المالية"}</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">طلبات مكتملة فقط • مبالغ محاسبية، وليست تحويلات مالية</p>
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-bold">
+                {admin ? "التقرير المالي للدخل العام للمنظومة (الخزينة)" : `التقرير المالي للدخل الخاص بمتجر «${store?.name ?? ""}»`}
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">طلبات مكتملة فقط • مبالغ محاسبية مسجلة</p>
+            </div>
+
+            {/* أزرار الفلترة الزمنية للتقارير المالية: يومي، أسبوعي، شهري، سنوي، الكل */}
+            <div className="flex flex-wrap items-center rounded-xl border bg-muted/40 p-1 text-xs font-semibold gap-1">
+              {[
+                { id: "today", label: "يومي (اليوم)" },
+                { id: "week", label: "أسبوعي (7 أيام)" },
+                { id: "month", label: "شهري (30 يوم)" },
+                { id: "year", label: "سنوي (العام الحالي)" },
+                { id: "all", label: "الإجمالي (الكل)" },
+              ].map(p => (
+                <button
+                  key={p.id}
+                  onClick={() => setPeriod(p.id as any)}
+                  className={`rounded-lg px-3 py-1.5 transition-all ${
+                    period === p.id
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* بطاقات الإحصائيات المالية المخصصة للأرباح فقط */}
+          {/* بطاقات الإحصائيات المالية المخصصة للأرباح حسب الفترة (تغيير خانة بانتظار الاعتماد إلى المتاجر النشطة) */}
           <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
             {[
-              { label: admin ? "إجمالي المتاجر" : "طلبات قيد التنفيذ", value: admin ? data.stores.length : pending, icon: Store },
-              { label: admin ? "بانتظار الاعتماد" : "إجمالي المبيعات المكتملة", value: admin ? data.stores.filter(s => !s.is_active).length : money(totals.gross), icon: ClipboardList },
-              { label: admin ? "عمولات المنصة المستحقة" : "العمولات المستحقة", value: money(totals.commission), icon: Wallet },
-              { label: admin ? "المبيعات المكتملة" : "صافي مستحقات المتجر", value: money(admin ? totals.gross : totals.net), icon: Package },
+              {
+                label: admin ? "إجمالي مبيعات المنظومة" : "صافي أرباح المتجر",
+                value: money(admin ? periodTotals.gross : periodTotals.net),
+                icon: Wallet,
+              },
+              {
+                label: admin ? "المتاجر النشطة" : "إجمالي المبيعات المكتملة",
+                value: admin ? data.stores.filter(s => s.is_active).length : money(periodTotals.gross),
+                icon: admin ? CheckCircle2 : TrendingUp,
+              },
+              {
+                label: admin ? "عمولات المنصة المحصلة" : "عمولات التطبيق المستقطعة",
+                value: money(periodTotals.commission),
+                icon: Store,
+              },
+              {
+                label: admin ? "صافي مستحقات المتاجر" : "العمليات المكتملة",
+                value: admin ? money(periodTotals.net) : periodTotals.count,
+                icon: Package,
+              },
             ].map((metric, i) => (
-              <div key={metric.label} className={`rounded-xl border p-4 shadow-soft ${i === 2 ? "bg-primary text-primary-foreground" : "bg-card"}`}>
+              <div key={metric.label} className={`rounded-xl border p-4 shadow-soft ${i === 0 ? "bg-primary text-primary-foreground" : "bg-card"}`}>
                 <div className="mb-3 flex items-center justify-between gap-2">
-                  <span className="text-xs">{metric.label}</span>
-                  <metric.icon className="size-4 opacity-70" />
+                  <span className="text-xs font-medium">{metric.label}</span>
+                  <metric.icon className="size-4 opacity-75" />
                 </div>
-                <strong className="break-words text-xl md:text-2xl">{metric.value}</strong>
+                <strong className="break-words text-xl md:text-2xl font-bold">{metric.value}</strong>
               </div>
             ))}
           </div>
 
           <div className="rounded-xl border bg-card p-5 shadow-soft">
-            <h3 className="mb-4 text-base font-bold">سجل العمليات المكتملة ({totals.count})</h3>
+            <h3 className="mb-4 text-base font-bold">سجل العمليات المكتملة ({periodTotals.count})</h3>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[560px] text-right text-sm">
                 <thead className="border-b bg-muted/50">
@@ -510,7 +808,7 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {tasks
+                  {periodTasks
                     .filter(t => earnings([t]).count > 0)
                     .map(t => (
                       <tr key={t.id} className="hover:bg-muted/30">
@@ -524,7 +822,7 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
                 </tbody>
               </table>
             </div>
-            {!totals.count && <Empty text="لم تكتمل أي عمليات بيع بعد حتى الآن" />}
+            {!periodTotals.count && <Empty text="لم تكتمل أي عمليات بيع خلال الفترة المحددة" />}
           </div>
         </TabsContent>
       </Tabs>

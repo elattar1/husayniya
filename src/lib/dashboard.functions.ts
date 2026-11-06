@@ -494,6 +494,7 @@ export const updateRequest = createServerFn({ method: "POST" })
               .from("orders")
               .update({
                 status: data.status,
+                ...(data.status === "preparing" ? { picked_up_at: new Date().toISOString() } : {}),
                 ...(data.status === "delivered" ? { payment_status: "paid_cash" } : {}),
               })
               .eq("id", data.id)
