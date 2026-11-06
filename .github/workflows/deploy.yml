@@ -1,0 +1,64 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Build project
+        env:
+          SUPABASE_URL: "https://c--7f108798-17ad-44e4-82b6-bd2a1099e61f-prod.lovable.cloud"
+          SUPABASE_PUBLISHABLE_KEY: "sb_publishable_TCPbl2pth3utjzW-0G3qJw_duzVIn5h"
+          VITE_SUPABASE_URL: "https://c--7f108798-17ad-44e4-82b6-bd2a1099e61f-prod.lovable.cloud"
+          VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_TCPbl2pth3utjzW-0G3qJw_duzVIn5h"
+        run: npm run build
+
+      - name: Determine upload directory
+        id: select-dir
+        run: |
+          if [ -d ".output/public" ]; then
+            echo "dir=.output/public" >> $GITHUB_OUTPUT
+          elif [ -d "dist" ]; then
+            echo "dir=dist" >> $GITHUB_OUTPUT
+          else
+            echo "dir=." >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ steps.select-dir.outputs.dir }}
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
