@@ -21,3 +21,4 @@
 - Delivery and fleet management pages live under the authenticated layout and use existing delivery server functions; fleet mutations retain server-side admin checks and wallet totals remain accounting records.
 - Navigation uses intent preloading and cached dashboard reads with background revalidation; public catalog lists exclude products/reviews, while store details, provider products, and order items use separate scoped queries to keep opening pages lightweight without truncating the earnings ledger.
 - Web push uses a dedicated Firebase messaging worker without app-shell caching; authenticated registration and test sends target only the caller's stored device token through the connector gateway.
+- Shared glass surfaces use global semantic tokens and standard backdrop-filter with an opaque fallback, keeping presentation changes independent of business logic.
