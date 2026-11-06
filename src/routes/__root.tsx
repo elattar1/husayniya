@@ -108,6 +108,25 @@ function RootShell({ children }: { children: ReactNode }) {
 }
 
 function RootComponent() {
+  useEffect(() => {
+    const removeBadge = () => {
+      const selectors = [
+        '#lovable-badge',
+        '#lovable-badge-container',
+        '.lovable-badge',
+        '[id*="lovable-badge"]',
+        'a[href*="lovable.dev"]',
+        'a[href*="lovable.app"]',
+      ];
+      selectors.forEach((sel) => {
+        document.querySelectorAll(sel).forEach((el) => el.remove());
+      });
+    };
+    removeBadge();
+    const observer = new MutationObserver(removeBadge);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, []);
   const { queryClient } = Route.useRouteContext();
   const router = useRouter();
   useEffect(() => {

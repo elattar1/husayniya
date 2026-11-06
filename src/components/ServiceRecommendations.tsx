@@ -76,7 +76,7 @@ export function ServiceRecommendations({ catalog, area }: { catalog: Catalog; ar
   }
   return <section aria-labelledby="recommendation-heading" className="border-b bg-secondary/40">
     <div className="mx-auto max-w-6xl px-4 py-7">
-      <div className="mb-4 flex items-center gap-3"><Sparkles className="size-6 shrink-0 text-primary" /><h2 id="recommendation-heading" className="text-xl">ما الخدمة التي تحتاجها؟</h2><span className="text-xs text-muted-foreground">Lovable AI</span></div>
+      <div className="mb-4 flex items-center gap-3"><Sparkles className="size-6 shrink-0 text-primary" /><h2 id="recommendation-heading" className="text-xl">ما الخدمة التي تحتاجها؟</h2><span className="text-xs text-muted-foreground">بالذكاء الاصطناعي</span></div>
       <form onSubmit={submit} className="flex flex-col items-start gap-3 sm:flex-row">
         <div className="w-full flex-1"><Textarea aria-label="وصف الخدمة المطلوبة" placeholder="مثلًا: محتاج سباك يصلح تسريب تحت حوض المطبخ" value={description} maxLength={1500} disabled={busy} onChange={e => { setDescription(e.target.value); setError(''); setResult(null); }} className="min-h-24 bg-card" />
           {area && <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground"><MapPin size={13} />{catalog.areas.find(a => String(a.id) === area)?.name}</p>}

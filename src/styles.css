@@ -141,3 +141,22 @@
 @utility bg-hero-overlay { background-image: var(--gradient-hero); }
 @utility bg-brand { background-image: var(--gradient-brand); }
 @utility shadow-soft { box-shadow: var(--shadow-soft); }
+
+/* إخفاء شارة Lovable */
+#lovable-badge,
+#lovable-badge-container,
+.lovable-badge,
+[id*="lovable-badge"],
+[class*="lovable-badge"],
+a[href*="lovable.dev"],
+a[href*="lovable.app"],
+div:has(> a[href*="lovable.dev"]),
+div:has(> a[href*="lovable.app"]) {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  height: 0 !important;
+  width: 0 !important;
+  overflow: hidden !important;
+}
