@@ -92,6 +92,13 @@
       "when": 1793961676962,
       "tag": "0012_store_product_sections",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793968299464,
+      "tag": "0013_real_husayniya_data",
+      "breakpoints": true
     }
   ]
 }
