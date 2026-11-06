@@ -1,3 +1,8 @@
+# Store product sections
+- [ ] Let providers create store sections and assign products to them.
+- [ ] Group supermarket and restaurant products by section on the customer store page.
+- [ ] Verify permissions, rules tests, and the provider/customer flows.
+
 # Mobile push notifications
 - [x] Connect Firebase Messaging with web push enabled.
 - [x] Add authenticated device registration and a test notification in «طلباتي».

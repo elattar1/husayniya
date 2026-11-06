@@ -20,11 +20,12 @@ export const getStoreDetails = createServerFn({ method: 'GET' }).inputValidator(
   const db = publicCatalogClient();
   const active = await db.from('stores').select('id').eq('id', data.storeId).eq('is_active', true).maybeSingle();
   if (active.error) throw new Error('تعذر تحميل المتجر');
-  if (!active.data) return { products: [], reviews: [] };
-  const [products, reviews] = await Promise.all([
-    db.from('products').select('id,store_id,name,description,price,is_available,image_url').eq('store_id', data.storeId).order('name'),
+  if (!active.data) return { products: [], reviews: [], sections: [] };
+  const [products, reviews, sections] = await Promise.all([
+    db.from('products').select('id,store_id,name,description,price,is_available,image_url,section_id').eq('store_id', data.storeId).order('name'),
     db.from('reviews').select('id,store_id,author_name,rating,comment,created_at').eq('store_id', data.storeId).order('created_at', { ascending: false }).limit(100),
+    db.from('store_sections').select('id,store_id,name,sort_order').eq('store_id', data.storeId).order('sort_order').order('name'),
   ]);
-  if (products.error || reviews.error) throw new Error('تعذر تحميل منتجات وتقييمات المتجر');
-  return { products: products.data ?? [], reviews: reviews.data ?? [] };
+  if (products.error || reviews.error || sections.error) throw new Error('تعذر تحميل منتجات وتقييمات المتجر');
+  return { products: products.data ?? [], reviews: reviews.data ?? [], sections: sections.data ?? [] };
 });

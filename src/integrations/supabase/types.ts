@@ -366,6 +366,7 @@ export type Database = {
           is_available: boolean
           name: string
           price: number
+          section_id: string | null
           stock_qty: number | null
           store_id: string
         }
@@ -378,6 +379,7 @@ export type Database = {
           is_available?: boolean
           name: string
           price: number
+          section_id?: string | null
           stock_qty?: number | null
           store_id: string
         }
@@ -390,10 +392,18 @@ export type Database = {
           is_available?: boolean
           name?: string
           price?: number
+          section_id?: string | null
           stock_qty?: number | null
           store_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "products_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "store_sections"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "products_store_id_fkey"
             columns: ["store_id"]
@@ -518,6 +528,38 @@ export type Database = {
           },
           {
             foreignKeyName: "service_requests_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      store_sections: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          sort_order: number
+          store_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          sort_order?: number
+          store_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          sort_order?: number
+          store_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_sections_store_id_fkey"
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
