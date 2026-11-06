@@ -74,6 +74,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <main>{children}</main>
 
+      {/* الشريط السفلي للهواتف المحمولة: حسابي دائمًا أقصى الشمال لجميع الحسابات */}
       <nav className="glass-surface fixed inset-x-0 bottom-0 z-40 flex justify-around border-t py-2 lg:hidden">
         <Link to="/" className={navItem} activeProps={active} activeOptions={{ exact: true }}>
           <Home className="h-5 w-5" />الرئيسية
@@ -84,16 +85,25 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Link to="/orders" className={navItem} activeProps={active}>
           <ClipboardList className="h-5 w-5" />طلباتي
         </Link>
-        <Link to={user ? "/account" : "/auth"} className={navItem} activeProps={active}>
-          <User className="h-5 w-5" />حسابي
-        </Link>
-        {isDriver && <Link to="/delivery" search={{ tab: "available" }} className={navItem} activeProps={active}><Truck className="h-5 w-5" />الدليفري</Link>}
-        {isAdmin && <Link to="/drivers" search={{ q: "" }} className={navItem} activeProps={active}><Users className="h-5 w-5" />الفريق</Link>}
+        {isDriver && (
+          <Link to="/delivery" search={{ tab: "available" }} className={navItem} activeProps={active}>
+            <Truck className="h-5 w-5" />الدليفري
+          </Link>
+        )}
+        {isAdmin && (
+          <Link to="/drivers" search={{ q: "" }} className={navItem} activeProps={active}>
+            <Users className="h-5 w-5" />الفريق
+          </Link>
+        )}
         {isAdmin && (
           <Link to="/admin" className={navItem} activeProps={active}>
             <Shield className="h-5 w-5" />الإدارة
           </Link>
         )}
+        {/* حسابي في آخر عنصر دائمًا فيكون أقصى الشمال (أقصى اليسار) في الاتجاه العربي RTL في أي حساب */}
+        <Link to={user ? "/account" : "/auth"} className={navItem} activeProps={active}>
+          <User className="h-5 w-5" />حسابي
+        </Link>
       </nav>
     </div>
   );
