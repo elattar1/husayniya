@@ -1,6 +1,7 @@
 import type { SearchSchemaInput } from '@tanstack/react-router';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useSuspenseQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Search, MapPin, ArrowLeft, Star, Clock3, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { pageMeta } from '@/lib/page-meta';
@@ -31,12 +32,29 @@ function Browse() {
   const { data } = useSuspenseQuery(catalogQuery);
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
+
+  // إدارة الفئة المحددة محليًا لمنع قفز الشاشة للأعلى عند التبديل
+  const [selectedCategory, setSelectedCategory] = useState<string>(
+    typeof search.category === 'string' ? search.category : ''
+  );
+
   const update = (values: Partial<typeof search>) =>
-    navigate({ search: (prev) => ({ ...prev, ...values }), replace: true });
+    navigate({
+      search: (prev) => ({ ...prev, ...values }),
+      replace: true,
+      resetScroll: false,
+    });
+
+  const handleCategoryChange = (cat: string) => {
+    setSelectedCategory(cat);
+    update({ category: cat });
+  };
+
+  const activeCategory = selectedCategory;
 
   const stores = data.stores.filter(
     (s) =>
-      (!search.category || s.category === search.category) &&
+      (!activeCategory || s.category === activeCategory) &&
       (!search.area || String(s.area_id) === search.area) &&
       `${s.name} ${s.description} ${s.specialty ?? ''}`.includes(search.q.trim())
   );
@@ -115,15 +133,18 @@ function Browse() {
 
       <section className="mx-auto max-w-6xl px-4 py-7">
         <div className="mb-7 flex gap-2 overflow-x-auto pb-2">
-          <Button variant={!search.category ? 'default' : 'outline'} onClick={() => update({ category: '' })}>
+          <Button
+            variant={!activeCategory ? 'default' : 'outline'}
+            onClick={() => handleCategoryChange('')}
+          >
             كل الخدمات
           </Button>
           {data.categories.map((c) => (
             <Button
               className="shrink-0"
               key={c.slug}
-              variant={search.category === c.slug ? 'default' : 'outline'}
-              onClick={() => update({ category: c.slug })}
+              variant={activeCategory === c.slug ? 'default' : 'outline'}
+              onClick={() => handleCategoryChange(c.slug)}
             >
               <span>{CATEGORY_ICONS[c.slug]}</span>
               {c.name}
@@ -133,7 +154,7 @@ function Browse() {
 
         <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-2xl">
-            {data.categories.find((c) => c.slug === search.category)?.name ?? 'اكتشف متاجر الحسينية'}
+            {data.categories.find((c) => c.slug === activeCategory)?.name ?? 'اكتشف متاجر الحسينية'}
           </h2>
           <span className="text-sm text-muted-foreground">{stores.length} متجر ومقدم خدمة</span>
         </div>
@@ -231,7 +252,13 @@ function Browse() {
           <div className="space-y-4 py-16 text-center">
             <Search className="mx-auto size-10 text-muted-foreground" />
             <h3>لا توجد نتائج مطابقة</h3>
-            <Button variant="outline" onClick={() => update({ q: '', category: '', area: '' })}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSelectedCategory('');
+                update({ q: '', category: '', area: '' });
+              }}
+            >
               مسح البحث
             </Button>
           </div>
