@@ -32,7 +32,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen pb-20 lg:pb-0">
-      <header className="sticky top-0 z-40 border-b bg-card/90 backdrop-blur">
+      <header className="glass-surface sticky top-0 z-40 border-b">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4">
           <Link to="/" className="flex items-center gap-2">
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-brand text-lg text-primary-foreground">ح</span>
@@ -74,7 +74,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <main>{children}</main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex justify-around border-t bg-card py-2 lg:hidden">
+      <nav className="glass-surface fixed inset-x-0 bottom-0 z-40 flex justify-around border-t py-2 lg:hidden">
         <Link to="/" className={navItem} activeProps={active} activeOptions={{ exact: true }}>
           <Home className="h-5 w-5" />الرئيسية
         </Link>
