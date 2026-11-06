@@ -33,19 +33,6 @@ const EXAMPLES = [
   'فني تكييفات يشحن فريون ويعمل صيانة دورية',
 ];
 
-const QUICK_CHIPS = [
-  'مشويات وطواجن',
-  'بيتزا وكريب',
-  'وجبات سريعة وبرجر',
-  'كشري وطواجن',
-  'أسماك وجمبري',
-  'صيدلية 24 ساعة',
-  'كشف دكتور أسنان',
-  'سباكة وصيانة',
-  'كهربائي منازل',
-  'نقل وتغليف عفش',
-];
-
 function useTypewriter(active: boolean) {
   const [text, setText] = useState('');
 
@@ -157,7 +144,7 @@ export function ServiceRecommendations({ catalog, area }: { catalog: Catalog; ar
   return (
     <section aria-labelledby="recommendation-heading" className="border-b bg-gradient-to-b from-secondary/50 via-secondary/20 to-background">
       <div className="mx-auto max-w-6xl px-4 py-8 md:py-10">
-        {/* صندوق البحث المربوط بقاعدة البيانات */}
+        {/* صندوق البحث البسيط والحديث */}
         <div className="rounded-2xl border border-border/80 bg-card/95 p-5 shadow-soft backdrop-blur-md md:p-7">
           <div className="mb-4 flex items-center gap-3">
             <div className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary">
@@ -165,11 +152,8 @@ export function ServiceRecommendations({ catalog, area }: { catalog: Catalog; ar
             </div>
             <div>
               <h2 id="recommendation-heading" className="text-xl font-bold md:text-2xl">
-                ما الخدمة أو الطلب الذي تبحث عنه؟
+                بتدور على إيه؟
               </h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                ابحث عن أي مطعم أو وجبة أو خدمة أو صيدلية وسنقترح عليك الأنسب في الحسينية فورًا
-              </p>
             </div>
           </div>
 
@@ -177,7 +161,7 @@ export function ServiceRecommendations({ catalog, area }: { catalog: Catalog; ar
             <div className="relative">
               <Textarea
                 aria-label="وصف الخدمة أو الوجبة المطلوبة"
-                placeholder={typed ? `${typed} |` : 'مثال: عايز كباب وكفتة، أو بيتزا، أو سباك، أو صيدلية...'}
+                placeholder={typed ? `${typed} |` : 'اكتب طلبك أو مشكلتك هنا...'}
                 value={description}
                 maxLength={1500}
                 disabled={busy}
@@ -196,26 +180,7 @@ export function ServiceRecommendations({ catalog, area }: { catalog: Catalog; ar
               )}
             </div>
 
-            {/* اقتراحات سريعة بنقرة واحدة */}
-            <div className="flex flex-wrap items-center gap-1.5 pt-1">
-              <span className="text-xs text-muted-foreground ml-1">اقتراحات سريعة:</span>
-              {QUICK_CHIPS.map((chip) => (
-                <button
-                  key={chip}
-                  type="button"
-                  onClick={() => {
-                    setDescription(chip);
-                    setError('');
-                    performSearch(chip);
-                  }}
-                  className="rounded-full border border-border/70 bg-secondary/60 px-3 py-1 text-xs text-foreground/80 transition-all hover:border-primary hover:bg-primary/10 hover:text-primary active:scale-95"
-                >
-                  {chip}
-                </button>
-              ))}
-            </div>
-
-            <div className="pt-2">
+            <div className="pt-1">
               <Button
                 type="submit"
                 disabled={busy || !description.trim()}
