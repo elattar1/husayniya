@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { Plus, Minus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/lib/cart";
@@ -37,7 +37,7 @@ export function StoreProducts({
       </div>
       {groups.length > 1 && (
         <nav aria-label="أقسام المنتجات" className="mb-7 flex gap-2 overflow-x-auto pb-2">
-          {groups.map(group => (
+          {groups.map((group) => (
             <a
               key={group.id}
               href={`#product-section-${group.id}`}
@@ -49,43 +49,98 @@ export function StoreProducts({
         </nav>
       )}
       <div className="space-y-9">
-        {groups.map(group => (
+        {groups.map((group) => (
           <section key={group.id} id={`product-section-${group.id}`} className="scroll-mt-28">
             <div className="mb-4 flex items-center gap-3 border-b pb-3">
               <h3 className="text-lg font-semibold">{group.name}</h3>
               <span className="text-sm text-muted-foreground">{group.products.length} منتجات</span>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
-              {group.products.map(product => (
-                <article className="flex min-w-0 items-center gap-4 rounded-lg border bg-card p-4" key={product.id}>
-                  {product.image_url && (
-                    <img
-                      src={product.image_url}
-                      alt={product.name}
-                      loading="lazy"
-                      className="size-20 shrink-0 rounded-md object-cover"
-                    />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <h4 className="break-words font-sans font-semibold">{product.name}</h4>
-                    <p className="my-2 text-sm text-muted-foreground">{product.description}</p>
-                    <p className="font-semibold text-primary">{money(product.price)}</p>
-                  </div>
-                  <Button
-                    size="icon"
-                    aria-label={`إضافة ${product.name} للسلة`}
-                    title={`إضافة ${product.name}`}
-                    disabled={!product.is_available || !store.is_open}
-                    onClick={() => {
-                      if (cart.add(store, { product_id: product.id, name: product.name, price: Number(product.price) })) {
-                        toast.success("تمت الإضافة للسلة");
-                      }
-                    }}
+              {group.products.map((product) => {
+                const itemInCart = cart.items.find((i) => i.product_id === product.id);
+                const qty = itemInCart?.qty ?? 0;
+                return (
+                  <article
+                    className="flex min-w-0 items-center gap-4 rounded-xl border bg-card p-4 shadow-soft transition-all"
+                    key={product.id}
                   >
-                    <Plus />
-                  </Button>
-                </article>
-              ))}
+                    {product.image_url && (
+                      <img
+                        src={product.image_url}
+                        alt={product.name}
+                        loading="lazy"
+                        className="size-20 shrink-0 rounded-lg object-cover"
+                      />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <h4 className="break-words font-sans font-semibold text-base">{product.name}</h4>
+                      <p className="my-1.5 text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                        {product.description}
+                      </p>
+                      <p className="font-bold text-primary text-sm">{money(product.price)}</p>
+                    </div>
+
+                    {/* زر الإضافة أو عداد الكمية */}
+                    <div className="shrink-0">
+                      {qty === 0 ? (
+                        <Button
+                          size="icon"
+                          className="size-9 rounded-xl shadow-sm transition-transform active:scale-95"
+                          aria-label={`إضافة ${product.name} للسلة`}
+                          title={`إضافة ${product.name}`}
+                          disabled={!product.is_available || !store.is_open}
+                          onClick={() => {
+                            if (
+                              cart.add(store, {
+                                product_id: product.id,
+                                name: product.name,
+                                price: Number(product.price),
+                              })
+                            ) {
+                              toast.success(`تمت إضافة ${product.name} للسلة`);
+                            }
+                          }}
+                        >
+                          <Plus className="size-4" />
+                        </Button>
+                      ) : (
+                        <div className="flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/5 p-1 shadow-sm">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="size-7 rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive active:scale-90 transition-transform"
+                            aria-label="تقليل أو حذف"
+                            title={qty === 1 ? "حذف من السلة" : "تقليل الكمية"}
+                            onClick={() => {
+                              cart.setQty(product.id, qty - 1);
+                              if (qty === 1) {
+                                toast.info(`تم حذف ${product.name} من السلة`);
+                              }
+                            }}
+                          >
+                            {qty === 1 ? <Trash2 className="size-3.5" /> : <Minus className="size-3.5" />}
+                          </Button>
+                          <span className="min-w-6 text-center font-bold text-sm text-primary tabular-nums">
+                            {qty}
+                          </span>
+                          <Button
+                            size="icon"
+                            className="size-7 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 active:scale-90 transition-transform shadow-none"
+                            aria-label="زيادة الكمية"
+                            title="زيادة الكمية"
+                            disabled={!product.is_available || !store.is_open}
+                            onClick={() => {
+                              cart.setQty(product.id, qty + 1);
+                            }}
+                          >
+                            <Plus className="size-3.5" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           </section>
         ))}
