@@ -1,16 +1,16 @@
 import { AddressPicker, rememberAddress } from '@/components/AddressPicker';
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { useSuspenseQuery, useQueryClient } from '@tanstack/react-query';
+import { useSuspenseQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { Suspense, useState, type FormEvent } from 'react';
-import { ShoppingCart, Minus, Plus, Trash2, ArrowLeft } from 'lucide-react';
+import { ShoppingCart, Minus, Plus, Trash2, ArrowLeft, Truck, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCart } from '@/lib/cart';
 import { useAuth } from '@/lib/auth';
 import { catalogQuery, storeDetailsQuery } from '@/lib/customer-queries';
-import { placeCustomerOrder } from '@/lib/customer.functions';
+import { placeCustomerOrder, getDeliveryAvailability } from '@/lib/customer.functions';
 import { money } from '@/lib/labels';
 import { pageMeta } from '@/lib/page-meta';
 import { CustomerError, CustomerNotFound } from '@/components/CustomerFeedback';
@@ -58,6 +58,13 @@ function CartContents({ storeId }: { storeId: string }) {
   const place = useServerFn(placeCustomerOrder);
   const navigate = Route.useNavigate();
   const client = useQueryClient();
+
+  const { data: deliveryStatus } = useQuery({
+    queryKey: ['delivery-availability'],
+    queryFn: () => getDeliveryAvailability(),
+    refetchInterval: 15_000,
+  });
+  const noDelivery = deliveryStatus !== undefined && !deliveryStatus.available;
 
   const store = data.stores.find(s => s.id === cart.store_id);
   const items = cart.items.map(i => {
@@ -172,8 +179,19 @@ function CartContents({ storeId }: { storeId: string }) {
                 </label>
                 <p className="border-y py-3 text-sm text-muted-foreground">طريقة الدفع: نقدًا عند الاستلام</p>
                 {unavailable && <p className="text-sm text-destructive">المتجر مغلق أو توجد منتجات غير متاحة</p>}
-                <Button className="w-full" type="submit" disabled={busy || unavailable}>
-                  {busy ? 'جاري إرسال الطلب...' : 'تأكيد وإرسال الطلب'}
+                {noDelivery && (
+                  <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3.5 text-destructive flex items-start gap-2.5">
+                    <Truck className="size-5 shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="block text-sm font-bold">لا يوجد توصيل في الوقت الحالي</strong>
+                      <p className="text-xs text-destructive/85 mt-0.5 leading-relaxed">
+                        نعتذر، لا يوجد كباتن دليفري متاحين للعمل حالياً. يرجى المحاولة في وقت لاحق عند تفعيل الوردية.
+                      </p>
+                    </div>
+                  </div>
+                )}
+                <Button className="w-full" type="submit" disabled={busy || unavailable || noDelivery}>
+                  {busy ? 'جاري إرسال الطلب...' : noDelivery ? 'التوصيل غير متاح الآن' : 'تأكيد وإرسال الطلب'}
                   <ArrowLeft />
                 </Button>
               </form>

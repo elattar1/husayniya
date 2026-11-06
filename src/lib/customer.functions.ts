@@ -55,6 +55,16 @@ export const placeCustomerOrder = createServerFn({ method: 'POST' })
       throw new Error('المتجر غير متاح للطلب الآن');
     }
 
+    // التحقق من وجود دليفري شغال في الوقت الحالي
+    const activeDrivers = await supabaseAdmin
+      .from('drivers')
+      .select('user_id', { count: 'exact', head: true })
+      .eq('is_active', true);
+
+    if (!activeDrivers.count || activeDrivers.count === 0) {
+      throw new Error('لا يوجد توصيل في الوقت الحالي، جميع كباتن التوصيل غير متاحين الآن');
+    }
+
     // 2. Normalize and resolve item product IDs (supports both legacy 35-char and new 36-char IDs)
     const storeSuffix = data.store_id.replace(/^.*-(\d{3,4})$/, '$1').padStart(4, '0');
     const resolvedItems = data.items.map(item => {
@@ -197,4 +207,14 @@ export const readNotification = createServerFn({ method: 'POST' })
     const result = await query;
     if (result.error) throw new Error('تعذر تحديث الإشعارات');
     return { success: true };
+  });
+
+export const getDeliveryAvailability = createServerFn({ method: 'GET' })
+  .handler(async () => {
+    const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+    const { count } = await supabaseAdmin
+      .from('drivers')
+      .select('user_id', { count: 'exact', head: true })
+      .eq('is_active', true);
+    return { available: (count ?? 0) > 0, count: count ?? 0 };
   });

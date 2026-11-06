@@ -11,14 +11,28 @@ export const getDriverBoard = createServerFn({ method: "POST" })
     const db = context.supabase;
     const me = await db.from("drivers").select("*").eq("user_id", context.userId).maybeSingle();
     if (me.error) throw new Error(me.error.message);
-    if (!me.data || !me.data.is_active) return { driver: me.data, available: [], mine: [], areas: [] };
+    if (!me.data) return { driver: null, available: [], mine: [], areas: [] };
     const [available, mine, areas] = await Promise.all([
-      db.from("orders").select(orderSelect).is("driver_id", null).eq("status", "preparing").order("created_at"),
+      me.data.is_active
+        ? db.from("orders").select(orderSelect).is("driver_id", null).eq("status", "preparing").order("created_at")
+        : Promise.resolve({ data: [] as any[], error: null }),
       db.from("orders").select(orderSelect).eq("driver_id", context.userId).order("created_at", { ascending: false }).limit(200),
       db.from("areas").select("*"),
     ]);
     for (const r of [available, mine, areas]) if (r.error) throw new Error(r.error.message);
     return { driver: me.data, available: available.data ?? [], mine: mine.data ?? [], areas: areas.data ?? [] };
+  });
+
+export const setMyDriverWorkingStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({ is_active: z.boolean() }))
+  .handler(async ({ context, data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const driver = await supabaseAdmin.from("drivers").select("user_id").eq("user_id", context.userId).maybeSingle();
+    if (!driver.data) throw new Error("حسابك غير مسجل ككابتن توصيل");
+    const r = await supabaseAdmin.from("drivers").update({ is_active: data.is_active }).eq("user_id", context.userId);
+    if (r.error) throw new Error(r.error.message);
+    return { ok: true, is_active: data.is_active };
   });
 
 export const claimOrder = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])

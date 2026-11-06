@@ -180,87 +180,24 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-7 md:px-6 md:py-10">
-      <div className="mb-7 flex flex-wrap items-start justify-between gap-4">
+      {/* شريط العنوان والتحديث */}
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b pb-4">
         <div>
-          <div className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
-            {admin ? <ShieldCheck size={16} /> : <Store size={16} />} خدمات الحسينية / {admin ? "الإدارة" : "مقدم الخدمة"}
+          <div className="mb-1 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+            {admin ? <ShieldCheck size={16} className="text-purple-600" /> : <Store size={16} className="text-primary" />} خدمات الحسينية / {admin ? "لوحة الإدارة السحابية" : "بوابة التاجر والمحل"}
           </div>
-          <h1 className="text-2xl md:text-3xl">{admin ? "لوحة الإدارة" : "إدارة متجرك"}</h1>
+          <h1 className="text-2xl font-bold">{admin ? "لوحة الإدارة والتحكم" : store?.name ?? "إدارة المتجر"}</h1>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" aria-label="تحديث البيانات" title="تحديث البيانات" onClick={() => client.invalidateQueries({ queryKey: ["dashboard"] })}>
-            <RefreshCw />
+            <RefreshCw className="size-4" />
           </Button>
-          <Button onClick={() => setStoreEdit("new")}>
-            <Plus /> {admin ? "إضافة خدمة / متجر" : "إضافة متجر"}
-          </Button>
-        </div>
-      </div>
-
-      {!admin && store && (
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b pb-5">
-          <div className="flex items-center gap-3">
-            <div className="grid size-12 place-items-center rounded-lg bg-primary/10 text-primary">
-              <Store />
-            </div>
-            <div>
-              <select
-                aria-label="المتجر الحالي"
-                className="max-w-64 bg-transparent text-lg font-semibold"
-                value={store.id}
-                onChange={e => {
-                  setSelectedStore(e.target.value);
-                  onSearch("");
-                }}
-              >
-                {data.stores.map(s => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-              <p className="text-sm text-muted-foreground">
-                {store.is_active ? "متجر معتمد" : "بانتظار اعتماد الإدارة"} • عمولة {store.commission_rate}٪
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={busy}
-              onClick={toggleStoreOpen}
-              className={`text-xs gap-1.5 font-medium ${
-                store.is_open
-                  ? "border-emerald-500/40 text-emerald-600 bg-emerald-500/10 hover:bg-emerald-500/20"
-                  : "border-destructive/40 text-destructive bg-destructive/10 hover:bg-destructive/20"
-              }`}
-            >
-              <span className={`size-2 rounded-full ${store.is_open ? "bg-emerald-500 animate-pulse" : "bg-destructive"}`} />
-              {store.is_open ? "المتجر مفتوح للطلبات" : "المتجر مغلق حاليًا"}
+          {admin && (
+            <Button onClick={() => setStoreEdit("new")} className="gap-1 font-bold">
+              <Plus className="size-4" /> إضافة خدمة / متجر
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setStoreEdit(store)} className="gap-1.5 text-xs">
-              <Pencil className="size-3.5" /> بيانات المتجر
-            </Button>
-          </div>
+          )}
         </div>
-      )}
-
-      <div className="mb-7 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {[
-          { label: admin ? "إجمالي المتاجر" : "طلبات قيد التنفيذ", value: admin ? data.stores.length : pending, icon: Store },
-          { label: admin ? "بانتظار الاعتماد" : "إجمالي المبيعات المكتملة", value: admin ? data.stores.filter(s => !s.is_active).length : money(totals.gross), icon: ClipboardList },
-          { label: "العمولات المستحقة", value: money(totals.commission), icon: Wallet },
-          { label: admin ? "المبيعات المكتملة" : "صافي مستحقات المتجر", value: money(admin ? totals.gross : totals.net), icon: Package },
-        ].map((metric, i) => (
-          <div key={metric.label} className={`rounded-lg border p-4 ${i === 2 ? "bg-primary text-primary-foreground" : "bg-card"}`}>
-            <div className="mb-4 flex items-center justify-between gap-2">
-              <span className="text-xs md:text-sm">{metric.label}</span>
-              <metric.icon className="size-4 opacity-70" />
-            </div>
-            <strong className="break-words text-xl md:text-2xl">{metric.value}</strong>
-          </div>
-        ))}
       </div>
 
       <Tabs dir="rtl" value={tab} onValueChange={onTab}>
@@ -355,32 +292,86 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
               {!stores.length && <Empty text="لا توجد متاجر مطابقة" />}
             </>
           ) : store ? (
-            <div className="grid gap-6 md:grid-cols-2">
-              <div>
-                <h2 className="mb-4 text-lg">بيانات المتجر</h2>
-                <dl className="space-y-4 text-sm">
-                  {[
-                    ["الاسم", store.name],
-                    ["القسم", data.categories.find(c => c.slug === store.category)?.name],
-                    ["المنطقة", data.areas.find(a => a.id === store.area_id)?.name],
-                    ["العنوان", store.address],
-                    ["الهاتف", store.phone],
-                    ["حالة العمل", store.is_open ? "مفتوح" : "مغلق"],
-                  ].map(([label, value]) => (
-                    <div key={label} className="flex justify-between gap-4 border-b pb-3">
-                      <dt className="text-muted-foreground">{label}</dt>
-                      <dd className="max-w-[65%] break-words text-left">{value || "—"}</dd>
-                    </div>
-                  ))}
-                </dl>
+            <div className="space-y-6">
+              {/* شريط المتجر وحالة العمل والتعديل السريع */}
+              <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border bg-card p-4 shadow-soft">
+                <div className="flex items-center gap-3">
+                  <div className="grid size-12 place-items-center rounded-lg bg-primary/10 text-primary">
+                    <Store />
+                  </div>
+                  <div>
+                    <select
+                      aria-label="المتجر الحالي"
+                      className="max-w-64 bg-transparent text-lg font-bold"
+                      value={store.id}
+                      onChange={e => {
+                        setSelectedStore(e.target.value);
+                        onSearch("");
+                      }}
+                    >
+                      {data.stores.map(s => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-muted-foreground">
+                      {store.is_active ? "متجر معتمد ونشط" : "بانتظار اعتماد الإدارة"} • عمولة {store.commission_rate}٪
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={busy}
+                    onClick={toggleStoreOpen}
+                    className={`text-xs gap-1.5 font-bold ${
+                      store.is_open
+                        ? "border-emerald-500/40 text-emerald-600 bg-emerald-500/10 hover:bg-emerald-500/20"
+                        : "border-destructive/40 text-destructive bg-destructive/10 hover:bg-destructive/20"
+                    }`}
+                  >
+                    <span className={`size-2 rounded-full ${store.is_open ? "bg-emerald-500 animate-pulse" : "bg-destructive"}`} />
+                    {store.is_open ? "المتجر مفتوح للطلبات" : "المتجر مغلق حاليًا"}
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setStoreEdit(store)} className="gap-1.5 text-xs font-semibold">
+                    <Pencil className="size-3.5" /> تعديل بيانات المتجر
+                  </Button>
+                </div>
               </div>
-              <div>
-                <h2 className="mb-4 text-lg">الرسوم والاعتماد</h2>
-                <p className="mb-3 text-sm">رسوم التوصيل: {money(store.delivery_fee)}</p>
-                <p className="mb-3 text-sm">رسوم الحجز: {money(store.booking_fee)}</p>
-                <p className="mb-3 text-sm">نسبة العمولة: {store.commission_rate}٪</p>
-                <div className="border-r-2 border-primary bg-primary/5 p-4 text-sm">
-                  {store.is_active ? "تم اعتماد المتجر ويمكن للعملاء الوصول إليه." : "متجرك محفوظ وبانتظار مراجعة الإدارة قبل ظهوره للعملاء."}
+
+              {/* بطاقة تفاصيل المتجر */}
+              <div className="grid gap-6 md:grid-cols-2 rounded-xl border bg-card p-5 shadow-soft">
+                <div>
+                  <h3 className="mb-4 text-base font-bold">بيانات المتجر والاتصال</h3>
+                  <dl className="space-y-3.5 text-sm">
+                    {[
+                      ["الاسم", store.name],
+                      ["القسم", data.categories.find(c => c.slug === store.category)?.name],
+                      ["المنطقة", data.areas.find(a => a.id === store.area_id)?.name],
+                      ["العنوان", store.address],
+                      ["الهاتف", store.phone],
+                      ["حالة العمل", store.is_open ? "مفتوح للطلبات" : "مغلق مؤقتاً"],
+                    ].map(([label, value]) => (
+                      <div key={label} className="flex justify-between gap-4 border-b pb-2.5">
+                        <dt className="text-muted-foreground">{label}</dt>
+                        <dd className="max-w-[65%] break-words text-left font-medium">{value || "—"}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+                <div>
+                  <h3 className="mb-4 text-base font-bold">الرسوم والاعتماد</h3>
+                  <div className="space-y-3 text-sm">
+                    <p>رسوم التوصيل المقررة: <strong>{money(store.delivery_fee)}</strong></p>
+                    <p>رسوم الحجز (إن وجد): <strong>{money(store.booking_fee)}</strong></p>
+                    <p>نسبة العمولة: <strong>{store.commission_rate}٪</strong></p>
+                    <div className="rounded-lg border-r-4 border-primary bg-primary/5 p-4 text-xs leading-relaxed">
+                      {store.is_active ? "تم اعتماد المتجر بالكامل ويمكن للعملاء الطلب منه." : "متجرك محفوظ وبانتظار مراجعة الإدارة قبل ظهوره للعملاء."}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -449,7 +440,14 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
         )}
 
         <TabsContent value="orders">
-          <h2 className="mb-4 text-lg">الطلبات والحجوزات والخدمات ({visibleTasks.length})</h2>
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold">{admin ? "جميع طلبات وحجوزات المنظومة" : "الطلبات والحجوزات الواردة للمتجر"} ({visibleTasks.length})</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                طلبات قيد التنفيذ: <span className="font-bold text-primary">{pending}</span> • طلبات مكتملة: <span className="font-bold text-success">{tasks.filter(t => ["delivered", "completed"].includes(t.status)).length}</span>
+              </p>
+            </div>
+          </div>
           <div className="divide-y border-y">
             {visibleTasks.map(t => (
               <div key={`${t.kind}-${t.id}`} className="flex flex-wrap items-center justify-between gap-4 py-5">
@@ -475,48 +473,59 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
         </TabsContent>
 
         <TabsContent value="earnings">
-          <h2 className="mb-2 text-lg">كشف الأرباح والعمولات</h2>
-          <p className="mb-6 text-sm text-muted-foreground">طلبات مكتملة فقط • مبالغ محاسبية، وليست تحويلات مالية</p>
-          <div className="mb-6 grid grid-cols-2 gap-5 border-y py-5 md:grid-cols-4">
+          <div className="mb-6">
+            <h2 className="text-lg font-bold">{admin ? "الخزينة وكشف عمولات المنصة" : "الأرباح والمستحقات المالية"}</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">طلبات مكتملة فقط • مبالغ محاسبية، وليست تحويلات مالية</p>
+          </div>
+
+          {/* بطاقات الإحصائيات المالية المخصصة للأرباح فقط */}
+          <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
             {[
-              ["عدد العمليات", totals.count],
-              ["إجمالي القيمة", money(totals.gross)],
-              ["عمولة المنصة", money(totals.commission)],
-              ["مستحقات المتاجر", money(totals.net)],
-            ].map(([label, value]) => (
-              <div key={label}>
-                <p className="mb-2 text-xs text-muted-foreground">{label}</p>
-                <strong className="text-lg">{value}</strong>
+              { label: admin ? "إجمالي المتاجر" : "طلبات قيد التنفيذ", value: admin ? data.stores.length : pending, icon: Store },
+              { label: admin ? "بانتظار الاعتماد" : "إجمالي المبيعات المكتملة", value: admin ? data.stores.filter(s => !s.is_active).length : money(totals.gross), icon: ClipboardList },
+              { label: admin ? "عمولات المنصة المستحقة" : "العمولات المستحقة", value: money(totals.commission), icon: Wallet },
+              { label: admin ? "المبيعات المكتملة" : "صافي مستحقات المتجر", value: money(admin ? totals.gross : totals.net), icon: Package },
+            ].map((metric, i) => (
+              <div key={metric.label} className={`rounded-xl border p-4 shadow-soft ${i === 2 ? "bg-primary text-primary-foreground" : "bg-card"}`}>
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <span className="text-xs">{metric.label}</span>
+                  <metric.icon className="size-4 opacity-70" />
+                </div>
+                <strong className="break-words text-xl md:text-2xl">{metric.value}</strong>
               </div>
             ))}
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[560px] text-right text-sm">
-              <thead className="border-b bg-muted/50">
-                <tr>
-                  {["الطلب", "المتجر", "القيمة", "العمولة", "الصافي"].map(h => (
-                    <th className="p-3 font-medium" key={h}>
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {tasks
-                  .filter(t => earnings([t]).count > 0)
-                  .map(t => (
-                    <tr className="border-b" key={t.id}>
-                      <td className="p-3 font-mono">{t.id.slice(0, 8)}</td>
-                      <td className="p-3">{storeName(t.store_id)}</td>
-                      <td className="p-3">{money(t.amount)}</td>
-                      <td className="p-3 text-primary">{money(t.commission)}</td>
-                      <td className="p-3">{money(t.amount - t.commission)}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
+
+          <div className="rounded-xl border bg-card p-5 shadow-soft">
+            <h3 className="mb-4 text-base font-bold">سجل العمليات المكتملة ({totals.count})</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[560px] text-right text-sm">
+                <thead className="border-b bg-muted/50">
+                  <tr>
+                    {["رقم الطلب", "المتجر", "القيمة الإجمالية", "العمولة", "الصافي المستحق"].map(h => (
+                      <th className="p-3 font-semibold text-xs" key={h}>
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {tasks
+                    .filter(t => earnings([t]).count > 0)
+                    .map(t => (
+                      <tr key={t.id} className="hover:bg-muted/30">
+                        <td className="p-3 font-mono text-xs">#{t.id.slice(0, 8)}</td>
+                        <td className="p-3 font-medium">{storeName(t.store_id)}</td>
+                        <td className="p-3 font-bold">{money(t.amount)}</td>
+                        <td className="p-3 text-primary font-medium">{money(t.commission)}</td>
+                        <td className="p-3 text-success font-bold">{money(t.amount - t.commission)}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+            {!totals.count && <Empty text="لم تكتمل أي عمليات بيع بعد حتى الآن" />}
           </div>
-          {!totals.count && <Empty text="لم تكتمل أي عمليات بعد" />}
         </TabsContent>
       </Tabs>
 
