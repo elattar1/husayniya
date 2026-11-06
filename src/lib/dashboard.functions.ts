@@ -3,6 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import {
   storeInput,
+  transferStoreOwnershipInput,
   productInput,
   sectionInput,
   commissionInput,
@@ -32,7 +33,7 @@ export const getDashboard = createServerFn({ method: "POST" })
     const rawStores = (stores.data ?? []).filter(s => !s.name.includes('(تجريبي)'));
     const storeMap = new Map();
     if (data.admin) {
-      REAL_STORES.forEach(s => storeMap.set(s.id, { ...s, owner_id: context.userId, created_at: new Date().toISOString() }));
+      REAL_STORES.forEach(s => storeMap.set(s.id, { ...s, owner_id: null, created_at: new Date().toISOString() }));
     }
     rawStores.forEach(s => storeMap.set(s.id, s));
     const mergedStores = Array.from(storeMap.values());
@@ -47,8 +48,45 @@ export const getDashboard = createServerFn({ method: "POST" })
     for (const result of [categories, areas, orders, bookings, services]) {
       if (result.error) throw new Error(result.error.message);
     }
+
+    let userProfiles: { id: string; email: string; name: string }[] = [];
+    const userEmailMap = new Map<string, string>();
+    const userNameMap = new Map<string, string>();
+
+    if (data.admin) {
+      try {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const [usersRes, profilesRes] = await Promise.all([
+          supabaseAdmin.auth.admin.listUsers({ perPage: 1000 }),
+          supabaseAdmin.from("profiles").select("id, full_name, phone"),
+        ]);
+        const profilesMap = new Map((profilesRes.data ?? []).map((p: any) => [p.id, p.full_name]));
+
+        const users = usersRes.data?.users ?? [];
+        users.forEach((u: any) => {
+          const profileName = profilesMap.get(u.id);
+          const metaName = (u.user_metadata?.full_name as string) || (u.user_metadata?.name as string) || "";
+          const name = profileName || metaName || (u.email ? u.email.split("@")[0] : "");
+          if (u.email) {
+            userEmailMap.set(u.id, u.email);
+            userNameMap.set(u.id, name);
+            userProfiles.push({ id: u.id, email: u.email, name });
+          }
+        });
+      } catch (e) {
+        console.error("Error fetching users for admin dashboard:", e);
+      }
+    }
+
+    const enrichedStores = mergedStores.map(s => ({
+      ...s,
+      owner_email: s.owner_id ? (userEmailMap.get(s.owner_id) ?? null) : null,
+      owner_name: s.owner_id ? (userNameMap.get(s.owner_id) ?? null) : null,
+    }));
+
     return {
-      stores: mergedStores,
+      stores: enrichedStores,
+      registeredUsers: userProfiles,
       categories: categories.data ?? [],
       areas: areas.data ?? [],
       orders: orders.data ?? [],
@@ -138,23 +176,60 @@ export const saveStore = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(storeInput)
   .handler(async ({ context, data }) => {
-    const { id, ...values } = data;
-    // Explicit ownership prevents an administrator using the provider screen to edit another store.
-    const result = id
-      ? await context.supabase
-          .from("stores")
-          .update(values)
-          .eq("id", id)
-          .eq("owner_id", context.userId)
+    const roleCheck = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
+    const isAdmin = !!roleCheck.data;
+    const { id, owner_email, ...values } = data;
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    let targetOwnerId: string | null = context.userId;
+
+    if (isAdmin && owner_email !== undefined) {
+      const trimmed = owner_email.trim().toLowerCase();
+      if (trimmed === "") {
+        targetOwnerId = null;
+      } else {
+        const usersRes = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+        const targetUser = (usersRes.data?.users ?? []).find(
+          (u: any) => (u.email ?? "").toLowerCase() === trimmed
+        );
+        if (!targetUser) {
+          throw new Error(`لم يتم العثور على أي حساب مسجل بالبريد: ${owner_email}`);
+        }
+        targetOwnerId = targetUser.id;
+        const roleCheckTarget = await supabaseAdmin
+          .from("user_roles")
           .select("id")
-          .single()
-      : await context.supabase
-          .from("stores")
-          .insert({ ...values, owner_id: context.userId })
-          .select("id")
-          .single();
-    if (result.error) throw new Error(result.error.message);
-    return result.data;
+          .eq("user_id", targetUser.id)
+          .eq("role", "provider")
+          .maybeSingle();
+        if (!roleCheckTarget.data) {
+          await supabaseAdmin.from("user_roles").insert({
+            user_id: targetUser.id,
+            role: "provider",
+          });
+        }
+      }
+    }
+
+    if (id) {
+      let query = supabaseAdmin.from("stores").update(
+        isAdmin && owner_email !== undefined ? { ...values, owner_id: targetOwnerId } : values
+      ).eq("id", id);
+      if (!isAdmin) {
+        query = query.eq("owner_id", context.userId);
+      }
+      const result = await query.select("id").single();
+      if (result.error) throw new Error(result.error.message);
+      return result.data;
+    } else {
+      const result = await supabaseAdmin.from("stores").insert({
+        ...values,
+        owner_id: isAdmin ? targetOwnerId : context.userId,
+      }).select("id").single();
+      if (result.error) throw new Error(result.error.message);
+      return result.data;
+    }
   });
 
 export const saveSection = createServerFn({ method: "POST" })
@@ -271,6 +346,109 @@ export const approveStore = createServerFn({ method: "POST" })
       .single();
     if (result.error) throw new Error(result.error.message);
     return result.data;
+  });
+
+export const transferStoreOwnership = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(transferStoreOwnershipInput)
+  .handler(async ({ context, data }) => {
+    const role = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
+    if (role.error || !role.data) throw new Error("هذه العملية مخصصة للإدارة فقط");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Case 1: Unassign ownership (make store public / unclaimed)
+    if (data.unassign) {
+      const existing = await supabaseAdmin.from("stores").select("id").eq("id", data.store_id).maybeSingle();
+      if (existing.data) {
+        const updateRes = await supabaseAdmin.from("stores").update({ owner_id: null }).eq("id", data.store_id);
+        if (updateRes.error) throw new Error(updateRes.error.message);
+      }
+      return { success: true, store_id: data.store_id, owner_email: null, message: "تم إلغاء تعيين المالك" };
+    }
+
+    // Case 2: Assign ownership by email
+    const trimmedEmail = (data.email ?? "").trim().toLowerCase();
+    if (!trimmedEmail || !trimmedEmail.includes("@")) {
+      throw new Error("يرجى إدخال بريد إلكتروني صحيح للمستخدم");
+    }
+
+    const usersRes = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+    const targetUser = (usersRes.data?.users ?? []).find(
+      (u: any) => (u.email ?? "").toLowerCase() === trimmedEmail
+    );
+
+    if (!targetUser) {
+      throw new Error(`لم يتم العثور على أي حساب مسجل بالبريد: ${trimmedEmail}. تأكد من تسجيل المستخدم في الموقع أولاً.`);
+    }
+
+    // Check if store exists in DB
+    const existing = await supabaseAdmin.from("stores").select("id").eq("id", data.store_id).maybeSingle();
+
+    if (!existing.data) {
+      // Store is in curated REAL_STORES
+      const staticStore = REAL_STORES.find(s => s.id === data.store_id);
+      if (!staticStore) throw new Error("المتجر أو الخدمة المطلوبة غير موجودة");
+
+      const insertStoreRes = await supabaseAdmin.from("stores").insert({
+        id: staticStore.id,
+        name: staticStore.name,
+        category: staticStore.category,
+        area_id: staticStore.area_id,
+        description: staticStore.description,
+        phone: staticStore.phone,
+        address: staticStore.address,
+        specialty: staticStore.specialty ?? null,
+        delivery_fee: staticStore.delivery_fee,
+        booking_fee: staticStore.booking_fee,
+        commission_rate: staticStore.commission_rate,
+        is_active: true,
+        is_open: staticStore.is_open,
+        logo_url: staticStore.logo_url,
+        banner_url: staticStore.banner_url,
+        owner_id: targetUser.id,
+      });
+      if (insertStoreRes.error) throw new Error(insertStoreRes.error.message);
+
+      // Seed sections and products from static data so new owner can manage them
+      const storeSections = REAL_SECTIONS.filter(sec => sec.store_id === staticStore.id);
+      if (storeSections.length > 0) {
+        await supabaseAdmin.from("store_sections").upsert(storeSections, { onConflict: "id", ignoreDuplicates: true });
+      }
+      const storeProducts = REAL_PRODUCTS.filter(p => p.store_id === staticStore.id);
+      if (storeProducts.length > 0) {
+        await supabaseAdmin.from("products").upsert(storeProducts, { onConflict: "id", ignoreDuplicates: true });
+      }
+    } else {
+      // Update existing DB store
+      const updateRes = await supabaseAdmin
+        .from("stores")
+        .update({ owner_id: targetUser.id, is_active: true })
+        .eq("id", data.store_id);
+      if (updateRes.error) throw new Error(updateRes.error.message);
+    }
+
+    // Ensure target user has 'provider' role in user_roles
+    const roleCheckTarget = await supabaseAdmin
+      .from("user_roles")
+      .select("id")
+      .eq("user_id", targetUser.id)
+      .eq("role", "provider")
+      .maybeSingle();
+
+    if (!roleCheckTarget.data) {
+      await supabaseAdmin.from("user_roles").insert({
+        user_id: targetUser.id,
+        role: "provider",
+      });
+    }
+
+    return {
+      success: true,
+      store_id: data.store_id,
+      owner_id: targetUser.id,
+      owner_email: targetUser.email,
+    };
   });
 
 export const updateRequest = createServerFn({ method: "POST" })
