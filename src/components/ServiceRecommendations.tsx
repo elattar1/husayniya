@@ -6,8 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/lib/auth';
 import type { Catalog } from '@/lib/customer-queries';
+import { CATEGORY_ICONS } from '@/lib/labels';
 import { recommendationInput, type RecommendationOutput } from '@/lib/recommendation-rules';
 import { recommendServices } from '@/lib/recommendations.functions';
+import { matchRecommendations } from '@/lib/recommendation-matcher';
+import { REAL_PRODUCTS } from '@/lib/real-stores-data';
 
 const EXAMPLES = [
   'محتاج سباك شاطر يصلح تسريب تحت حوض المطبخ',
@@ -31,12 +34,15 @@ const EXAMPLES = [
 ];
 
 const QUICK_CHIPS = [
-  'سباكة وصيانة',
   'مشويات وطواجن',
-  'صيدلية 24 ساعة',
   'بيتزا وكريب',
-  'كشف أسنان',
+  'وجبات سريعة وبرجر',
   'كشري وطواجن',
+  'أسماك وجمبري',
+  'صيدلية 24 ساعة',
+  'كشف دكتور أسنان',
+  'سباكة وصيانة',
+  'كهربائي منازل',
   'نقل وتغليف عفش',
 ];
 
@@ -95,32 +101,63 @@ export function ServiceRecommendations({ catalog, area }: { catalog: Catalog; ar
   const [error, setError] = useState('');
   const [result, setResult] = useState<RecommendationOutput | null>(null);
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    if (busy || !user) return;
-    const parsed = recommendationInput.safeParse({ description, area_id: Number(area) || null });
-    if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'تحقق من الوصف');
+  async function performSearch(queryText: string) {
+    const text = queryText.trim();
+    if (!text) {
+      setError('يرجى كتابة ما تبحث عنه');
       return;
     }
     setBusy(true);
     setError('');
     setResult(null);
+
     try {
-      const response = await recommend({ data: parsed.data });
-      if (response.ok) setResult(response);
-      else setError(response.message);
-    } catch (failure) {
-      setError(failure instanceof Error ? failure.message : 'تعذر الحصول على الاقتراحات الآن');
+      // 1. مطابقة مباشرة وفورية مع قاعدة البيانات الكاملة للمتاجر والمنتجات
+      const localMatches = matchRecommendations(
+        text,
+        Number(area) || null,
+        catalog.stores,
+        REAL_PRODUCTS
+      );
+
+      // 2. إذا كان المستخدم مسجلًا للدخول، نحاول الاستعلام عن خادم الاقتراحات للتعزيز
+      if (user) {
+        try {
+          const parsed = recommendationInput.safeParse({
+            description: text,
+            area_id: Number(area) || null,
+          });
+          if (parsed.success) {
+            const serverRes = await recommend({ data: parsed.data });
+            if (serverRes && serverRes.ok && serverRes.suggestions.length > 0) {
+              setResult(serverRes);
+              return;
+            }
+          }
+        } catch (serverErr) {
+          console.warn('Server recommendation fallback to live catalog matcher:', serverErr);
+        }
+      }
+
+      // عرض نتائج محرك المطابقة المربوط بقاعدة البيانات والمنيو
+      setResult(localMatches);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'تعذر البحث عن اقتراحات الآن');
     } finally {
       setBusy(false);
     }
   }
 
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (busy) return;
+    performSearch(description);
+  }
+
   return (
     <section aria-labelledby="recommendation-heading" className="border-b bg-gradient-to-b from-secondary/50 via-secondary/20 to-background">
       <div className="mx-auto max-w-6xl px-4 py-8 md:py-10">
-        {/* صندوق البحث المحسّن بتصميم حديث وفخم */}
+        {/* صندوق البحث المربوط بقاعدة البيانات */}
         <div className="rounded-2xl border border-border/80 bg-card/95 p-5 shadow-soft backdrop-blur-md md:p-7">
           <div className="mb-4 flex items-center gap-3">
             <div className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary">
@@ -128,10 +165,10 @@ export function ServiceRecommendations({ catalog, area }: { catalog: Catalog; ar
             </div>
             <div>
               <h2 id="recommendation-heading" className="text-xl font-bold md:text-2xl">
-                ما الخدمة التي تحتاجها؟
+                ما الخدمة أو الطلب الذي تبحث عنه؟
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                اكتب طلبك أو مشكلتك وسنقترح عليك أفضل الأماكن والفنيين في الحسينية
+                ابحث عن أي مطعم أو وجبة أو خدمة أو صيدلية وسنقترح عليك الأنسب في الحسينية فورًا
               </p>
             </div>
           </div>
@@ -139,15 +176,14 @@ export function ServiceRecommendations({ catalog, area }: { catalog: Catalog; ar
           <form onSubmit={submit} className="space-y-3">
             <div className="relative">
               <Textarea
-                aria-label="وصف الخدمة المطلوبة"
-                placeholder={typed ? `${typed} |` : 'اكتب ما تبحث عنه...'}
+                aria-label="وصف الخدمة أو الوجبة المطلوبة"
+                placeholder={typed ? `${typed} |` : 'مثال: عايز كباب وكفتة، أو بيتزا، أو سباك، أو صيدلية...'}
                 value={description}
                 maxLength={1500}
                 disabled={busy}
                 onChange={(e) => {
                   setDescription(e.target.value);
                   setError('');
-                  setResult(null);
                 }}
                 className="min-h-24 w-full rounded-xl border border-border/90 bg-background/80 p-4 text-base leading-relaxed transition-all placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
@@ -168,10 +204,11 @@ export function ServiceRecommendations({ catalog, area }: { catalog: Catalog; ar
                   key={chip}
                   type="button"
                   onClick={() => {
-                    setDescription(`محتاج ${chip} في الحسينية`);
+                    setDescription(chip);
                     setError('');
+                    performSearch(chip);
                   }}
-                  className="rounded-full border border-border/70 bg-secondary/60 px-3 py-1 text-xs text-foreground/80 transition-all hover:border-primary hover:bg-primary/10 hover:text-primary"
+                  className="rounded-full border border-border/70 bg-secondary/60 px-3 py-1 text-xs text-foreground/80 transition-all hover:border-primary hover:bg-primary/10 hover:text-primary active:scale-95"
                 >
                   {chip}
                 </button>
@@ -179,23 +216,14 @@ export function ServiceRecommendations({ catalog, area }: { catalog: Catalog; ar
             </div>
 
             <div className="pt-2">
-              {user ? (
-                <Button
-                  type="submit"
-                  disabled={busy || !description.trim()}
-                  className="h-11 w-full sm:w-auto px-6 rounded-xl text-sm font-semibold shadow-sm transition-transform active:scale-[0.98]"
-                >
-                  {busy ? <LoaderCircle className="ml-2 size-4 animate-spin" /> : <Search className="ml-2 size-4" />}
-                  {busy ? 'جاري البحث عن الأنسب...' : 'ابحث واقترح لي الأنسب'}
-                </Button>
-              ) : (
-                <Button asChild className="h-11 w-full sm:w-auto px-6 rounded-xl text-sm font-semibold shadow-sm">
-                  <Link to="/auth" search={{ redirect: '/' }}>
-                    سجل الدخول للاقتراحات المخصصة
-                    <ArrowLeft className="mr-2 size-4" />
-                  </Link>
-                </Button>
-              )}
+              <Button
+                type="submit"
+                disabled={busy || !description.trim()}
+                className="h-11 w-full sm:w-auto px-6 rounded-xl text-sm font-semibold shadow-sm transition-transform active:scale-[0.98]"
+              >
+                {busy ? <LoaderCircle className="ml-2 size-4 animate-spin" /> : <Search className="ml-2 size-4" />}
+                {busy ? 'جاري البحث في المتاجر والمنيو...' : 'ابحث واقترح لي الأنسب'}
+              </Button>
             </div>
           </form>
 
@@ -204,7 +232,7 @@ export function ServiceRecommendations({ catalog, area }: { catalog: Catalog; ar
             {error && <p role="alert" className="mt-4 text-sm text-destructive">{error}</p>}
             {result && (
               <div className="mt-6 border-t pt-5">
-                <p className="mb-4 text-sm font-medium">{result.summary}</p>
+                <p className="mb-4 text-sm font-semibold text-foreground">{result.summary}</p>
                 <div className="grid gap-3 md:grid-cols-3">
                   {result.suggestions.map((suggestion) => {
                     const store = catalog.stores.find((s) => s.id === suggestion.store_id);
@@ -218,19 +246,33 @@ export function ServiceRecommendations({ catalog, area }: { catalog: Catalog; ar
                       >
                         <div>
                           <div className="flex items-center justify-between gap-2">
-                            <h3 className="break-words text-base font-semibold group-hover:text-primary transition-colors">
-                              {store.name}
-                            </h3>
+                            <div className="flex items-center gap-2 min-w-0">
+                              {store.logo_url ? (
+                                <img
+                                  src={store.logo_url}
+                                  alt=""
+                                  loading="lazy"
+                                  className="size-9 rounded-lg object-cover border"
+                                />
+                              ) : (
+                                <span className="grid size-9 place-items-center rounded-lg bg-secondary text-lg">
+                                  {CATEGORY_ICONS[store.category]}
+                                </span>
+                              )}
+                              <h3 className="truncate text-base font-semibold group-hover:text-primary transition-colors">
+                                {store.name}
+                              </h3>
+                            </div>
                             <ArrowLeft className="size-4 shrink-0 text-primary transition-transform group-hover:-translate-x-1" />
                           </div>
-                          <p className="mb-3 mt-2 break-words text-xs text-muted-foreground line-clamp-2">
+                          <p className="mb-3 mt-2 break-words text-xs text-muted-foreground line-clamp-2 leading-relaxed">
                             {suggestion.reason}
                           </p>
                         </div>
                         <div className="flex flex-wrap justify-between gap-2 border-t pt-2 text-xs text-muted-foreground">
                           <span>{catalog.areas.find((a) => a.id === store.area_id)?.name ?? 'الحسينية'}</span>
-                          <span className={store.is_open ? 'text-success font-medium' : ''}>
-                            {store.is_open ? 'مفتوح الآن' : 'مغلق'}
+                          <span className={store.is_open ? 'text-emerald-600 font-semibold' : ''}>
+                            {store.is_open ? '🟢 مفتوح الآن' : '⚪ مغلق'}
                           </span>
                         </div>
                       </Link>
