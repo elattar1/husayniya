@@ -12,6 +12,7 @@
 - Provider and admin dashboards live under the authenticated pathless layout while preserving /provider and /admin URLs; this keeps private loaders behind the session gate.
 - Dashboard reads and mutations use authenticated server functions and user-scoped RLS clients; every admin operation additionally validates the stored admin role.
 - Dashboard business validation and accounting calculations live in dashboard-rules with focused tests; completed requests alone contribute earned revenue.
+- Store product sections are store-owned records; product assignment is validated against the same store in both server functions and the database, while public store details group products without changing cart behavior.
 
 - Customer catalog reads use a public publishable server client; customer mutations and private tracking use authenticated server functions with explicit customer scoping, so the shared dashboard records remain authoritative.
 - Customer orders and notifications live under the authenticated pathless layout; cart and store pages remain public with inline sign-in for submissions.
