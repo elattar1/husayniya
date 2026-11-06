@@ -84,8 +84,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Link to="/orders" className={navItem} activeProps={active}>
           <ClipboardList className="h-5 w-5" />طلباتي
         </Link>
-        <Link to="/provider" className={navItem} activeProps={active}>
-          <Store className="h-5 w-5" />محلي
+        <Link to={user ? "/account" : "/auth"} className={navItem} activeProps={active}>
+          <User className="h-5 w-5" />حسابي
         </Link>
         {isDriver && <Link to="/delivery" search={{ tab: "available" }} className={navItem} activeProps={active}><Truck className="h-5 w-5" />الدليفري</Link>}
         {isAdmin && <Link to="/drivers" search={{ q: "" }} className={navItem} activeProps={active}><Users className="h-5 w-5" />الفريق</Link>}
