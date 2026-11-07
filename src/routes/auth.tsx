@@ -1,9 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
-import { Store, ArrowLeft, LogIn, Mail, Lock, UserPlus, LoaderCircle, CheckCircle2 } from "lucide-react";
+import { useState } from "react";
+import { Store, ArrowLeft, LoaderCircle, ShieldCheck, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { lovable } from "@/integrations/lovable";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -14,9 +12,32 @@ export const Route = createFileRoute("/auth")({
     const r = s["redirect"];
     return { redirect: typeof r === "string" && r.startsWith("/") && !r.startsWith("//") ? r : "/" };
   },
-  head: () => pageMeta("تسجيل الدخول", "تسجيل الدخول لطلب الخدمات ومتابعتها وإدارة متجرك في خدمات الحسينية"),
+  head: () => pageMeta("تسجيل الدخول", "تسجيل الدخول لطلب الخدمات ومتابعتها وإدارة متجرك في خدمات الحسينية عبر حساب Google"),
   component: Auth,
 });
+
+function GoogleIcon() {
+  return (
+    <svg className="size-5 shrink-0" viewBox="0 0 24 24">
+      <path
+        fill="#4285F4"
+        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+      />
+    </svg>
+  );
+}
 
 function Auth() {
   const { user } = useAuth();
@@ -24,16 +45,11 @@ function Auth() {
   const { redirect } = Route.useSearch();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
 
   // تسجيل الدخول بواسطة Google فقط
   async function signInGoogle() {
     setBusy(true);
     setError("");
-    setSuccess("");
     try {
       const redirectUri = `${window.location.origin}/auth?redirect=${encodeURIComponent(redirect)}`;
       const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: redirectUri });
@@ -51,55 +67,6 @@ function Auth() {
     }
   }
 
-  // تسجيل الدخول أو إنشاء حساب بالبريد الإلكتروني وكلمة المرور
-  async function handleEmailAuth(e: FormEvent) {
-    e.preventDefault();
-    if (busy) return;
-    setError("");
-    setSuccess("");
-    setBusy(true);
-
-    try {
-      if (isSignUp) {
-        const { data, error: signUpError } = await supabase.auth.signUp({
-          email: email.trim(),
-          password: password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/auth?redirect=${encodeURIComponent(redirect)}`,
-          },
-        });
-        if (signUpError) throw signUpError;
-        if (data.session) {
-          navigate({ to: redirect });
-        } else {
-          setSuccess("تم إنشاء الحساب بنجاح! تفقد بريدك الإلكتروني لتأكيد التسجيل ثم سجل الدخول.");
-        }
-      } else {
-        const { data, error: signInError } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password: password,
-        });
-        if (signInError) throw signInError;
-        if (data.session) {
-          navigate({ to: redirect });
-        }
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "حدث خطأ أثناء معالجة الطلب";
-      if (msg.includes("Invalid login credentials")) {
-        setError("بيانات الدخول غير صحيحة، يرجى التحقق من البريد الإلكتروني وكلمة المرور.");
-      } else if (msg.includes("User already registered")) {
-        setError("هذا البريد مسجل مسبقًا، يمكنك تسجيل الدخول مباشرة.");
-      } else if (msg.includes("Password should be at least")) {
-        setError("كلمة المرور يجب أن تكون 6 أحرف على الأقل.");
-      } else {
-        setError(msg);
-      }
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return (
     <div className="mx-auto flex min-h-[75vh] max-w-md flex-col justify-center px-4 py-12">
       <div className="rounded-2xl border bg-card p-6 shadow-soft sm:p-8">
@@ -109,23 +76,24 @@ function Auth() {
           </div>
           <h1 className="text-2xl font-bold md:text-3xl">خدمات الحسينية</h1>
           <p className="mt-1 text-xs text-muted-foreground">
-            {user ? "مرحبًا بك، تم تسجيل دخولك بنجاح" : isSignUp ? "إنشاء حساب عميل جديد" : "تسجيل الدخول إلى حسابك"}
+            {user ? "مرحبًا بك، تم تسجيل دخولك بنجاح" : "تسجيل الدخول السريع والآمن عبر حساب Google"}
           </p>
         </div>
 
         {user ? (
           <div className="space-y-3">
             <div className="rounded-xl border bg-secondary/50 p-3 text-center text-sm">
-              <p className="font-medium">{user.email || "حساب مسجل"}</p>
+              <p className="font-medium text-foreground">{user.email || "حساب مسجل"}</p>
+              <span className="text-[11px] text-muted-foreground mt-0.5 block">أنت مسجل الدخول حالياً</span>
             </div>
-            <Button asChild className="w-full">
+            <Button asChild className="w-full font-bold">
               <Link to={redirect.startsWith("/admin") ? "/admin" : "/"}>
                 الانتقال إلى {redirect.startsWith("/admin") ? "لوحة الإدارة" : "الصفحة الرئيسية"}
                 <ArrowLeft className="mr-2 size-4" />
               </Link>
             </Button>
             <Button variant="outline" asChild className="w-full">
-              <Link to="/account">إعدادات الحساب والشكاوى</Link>
+              <Link to="/account">حسابي والطلبات السابقة</Link>
             </Button>
             <Button
               variant="ghost"
@@ -139,100 +107,39 @@ function Auth() {
             </Button>
           </div>
         ) : (
-          <div className="space-y-4">
-            {/* تسجيل الدخول بحساب Google فقط وبدون لافابول */}
+          <div className="space-y-5">
+            {error && (
+              <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive text-center">
+                {error}
+              </div>
+            )}
+
+            {/* زر تسجيل الدخول المباشر بواسطة Google فقط */}
             <Button
               type="button"
               disabled={busy}
               onClick={signInGoogle}
-              className="h-11 w-full gap-2 text-sm font-semibold shadow-sm"
+              className="h-12 w-full gap-3 text-sm font-bold shadow-md bg-white hover:bg-neutral-50 text-neutral-800 border border-neutral-300 dark:bg-neutral-900 dark:hover:bg-neutral-800 dark:text-neutral-100 dark:border-neutral-700 transition-all"
             >
-              {busy ? <LoaderCircle className="size-4 animate-spin" /> : <LogIn className="size-4" />}
-              المتابعة باستخدام Google
+              {busy ? <LoaderCircle className="size-5 animate-spin" /> : <GoogleIcon />}
+              <span>{busy ? "جارٍ الاتصال بـ Google..." : "المتابعة باستخدام Google"}</span>
             </Button>
 
-            {/* فاصل */}
-            <div className="relative my-4 flex items-center justify-center">
-              <div className="w-full border-t border-border/80" />
-              <span className="absolute bg-card px-3 text-xs text-muted-foreground">أو بالبريد الإلكتروني</span>
+            {/* مميزات تسجيل الدخول عبر Google */}
+            <div className="rounded-xl border bg-muted/30 p-4 space-y-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="size-4 text-primary shrink-0" />
+                <span>تسجيل دخول فوري وآمن بنقرة واحدة بدون كلمة مرور</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span>حفظ تلقائي لعناوين التوصيل وسجل الطلبات</span>
+              </div>
             </div>
 
-            {/* نموذج تسجيل الدخول / إنشاء الحساب */}
-            <form onSubmit={handleEmailAuth} className="space-y-3">
-              <div className="space-y-1">
-                <Label htmlFor="email" className="text-xs font-medium">البريد الإلكتروني</Label>
-                <div className="relative">
-                  <Mail className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                  <Input
-                    id="email"
-                    type="email"
-                    required
-                    disabled={busy}
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="name@example.com"
-                    className="h-10 pr-9 text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor="password" className="text-xs font-medium">كلمة المرور</Label>
-                <div className="relative">
-                  <Lock className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    type="password"
-                    required
-                    minLength={6}
-                    disabled={busy}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="h-10 pr-9 text-sm"
-                  />
-                </div>
-              </div>
-
-              {error && (
-                <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
-                  {error}
-                </div>
-              )}
-
-              {success && (
-                <div className="flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-700 dark:text-emerald-400">
-                  <CheckCircle2 className="size-4 shrink-0 mt-0.5" />
-                  <span>{success}</span>
-                </div>
-              )}
-
-              <Button type="submit" disabled={busy} variant="secondary" className="h-10 w-full font-semibold">
-                {busy ? (
-                  <LoaderCircle className="size-4 animate-spin ml-2" />
-                ) : isSignUp ? (
-                  <UserPlus className="size-4 ml-2" />
-                ) : (
-                  <LogIn className="size-4 ml-2" />
-                )}
-                {isSignUp ? "إنشاء حساب جديد" : "تسجيل الدخول"}
-              </Button>
-            </form>
-
-            {/* زر التبديل بين تسجيل الدخول وإنشاء حساب */}
-            <div className="pt-2 text-center">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsSignUp(!isSignUp);
-                  setError("");
-                  setSuccess("");
-                }}
-                className="text-xs text-primary hover:underline font-medium transition-colors"
-              >
-                {isSignUp ? "لديك حساب بالفعل؟ سجل دخولك الآن" : "ليس لديك حساب؟ أنشئ حسابًا جديدًا"}
-              </button>
-            </div>
+            <p className="text-center text-[11px] text-muted-foreground leading-relaxed">
+              بتسجيل الدخول، فإنك توافق على شروط الاستخدام وسياسة الخصوصية الخاصة بتطبيق خدمات الحسينية.
+            </p>
           </div>
         )}
       </div>
