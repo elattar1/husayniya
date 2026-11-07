@@ -1,4 +1,5 @@
 import { AddressPicker, rememberAddress } from '@/components/AddressPicker';
+import { StoreProducts } from '@/components/StoreProducts';
 import { createFileRoute, Link, notFound } from '@tanstack/react-router';
 import { useSuspenseQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
@@ -196,112 +197,11 @@ function StorePage() {
       </header>
 
       {!doctor && !service ? (
-        <>
-          <div className="mb-5 flex flex-wrap justify-between gap-3">
-            <h2 className="text-xl">المنتجات</h2>
-            <p className="text-sm text-muted-foreground">
-              رسوم التوصيل: {money(store.delivery_fee)}
-            </p>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            {products.map((p) => {
-              const itemInCart = cart.items.find((i) => i.product_id === p.id);
-              const qty = itemInCart?.qty ?? 0;
-              return (
-                <article
-                  className="flex min-w-0 items-center gap-4 rounded-xl border bg-card p-4 shadow-soft transition-all"
-                  key={p.id}
-                >
-                  {p.image_url && (
-                    <img
-                      src={p.image_url}
-                      alt={p.name}
-                      loading="lazy"
-                      className="size-20 shrink-0 rounded-lg object-cover"
-                    />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <h3 className="break-words font-sans font-semibold text-base">{p.name}</h3>
-                    <p className="my-1.5 text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                      {p.description}
-                    </p>
-                    <p className="font-bold text-primary text-sm">{money(p.price)}</p>
-                  </div>
-
-                  {/* زر الإضافة أو عداد التحكم بالكمية في السلة */}
-                  <div className="shrink-0">
-                    {qty === 0 ? (
-                      <Button
-                        size="icon"
-                        className="size-9 rounded-xl shadow-sm transition-transform active:scale-95"
-                        aria-label={`إضافة ${p.name} للسلة`}
-                        title={`إضافة ${p.name}`}
-                        disabled={!p.is_available || !store.is_open}
-                        onClick={() => {
-                          if (
-                            cart.add(store, {
-                              product_id: p.id,
-                              name: p.name,
-                              price: Number(p.price),
-                            })
-                          ) {
-                            toast.success(`تمت إضافة ${p.name} للسلة`);
-                          }
-                        }}
-                      >
-                        <Plus className="size-4" />
-                      </Button>
-                    ) : (
-                      <div className="flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/5 p-1 shadow-sm">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="size-7 rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive active:scale-90 transition-transform"
-                          aria-label="تقليل أو حذف"
-                          title={qty === 1 ? 'حذف من السلة' : 'تقليل الكمية'}
-                          onClick={() => {
-                            cart.setQty(p.id, qty - 1);
-                            if (qty === 1) {
-                              toast.info(`تم حذف ${p.name} من السلة`);
-                            }
-                          }}
-                        >
-                          {qty === 1 ? (
-                            <Trash2 className="size-3.5" />
-                          ) : (
-                            <Minus className="size-3.5" />
-                          )}
-                        </Button>
-
-                        <span className="min-w-6 text-center font-bold text-sm text-primary tabular-nums">
-                          {qty}
-                        </span>
-
-                        <Button
-                          size="icon"
-                          className="size-7 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 active:scale-90 transition-transform shadow-none"
-                          aria-label="زيادة الكمية"
-                          title="زيادة الكمية"
-                          disabled={!p.is_available || !store.is_open}
-                          onClick={() => {
-                            cart.setQty(p.id, qty + 1);
-                          }}
-                        >
-                          <Plus className="size-3.5" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-
-          {!products.length && (
-            <p className="py-12 text-center text-muted-foreground">لا توجد منتجات بعد</p>
-          )}
-        </>
+        <StoreProducts
+          store={store}
+          products={products}
+          sections={details.sections ?? []}
+        />
       ) : (
         <section className="max-w-2xl">
           <h2 className="mb-5 flex items-center gap-2 text-xl">

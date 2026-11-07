@@ -1,6 +1,8 @@
-import { Plus, Minus, Trash2 } from "lucide-react";
+import { useState, useRef } from "react";
+import { Plus, Minus, Trash2, UtensilsCrossed, Layers } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useCart } from "@/lib/cart";
 import type { Catalog } from "@/lib/customer-queries";
 import { money } from "@/lib/labels";
@@ -28,40 +30,117 @@ export function StoreProducts({
 }) {
   const cart = useCart();
   const groups = groupProductsBySection(products, sections);
+  const [activeSectionId, setActiveSectionId] = useState<string>("all");
+  const navRef = useRef<HTMLDivElement>(null);
+
+  const handleSelectSection = (sectionId: string) => {
+    setActiveSectionId(sectionId);
+    if (sectionId === "all") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      const element = document.getElementById(`product-section-${sectionId}`);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+  };
 
   return (
     <div>
-      <div className="mb-5 flex flex-wrap justify-between gap-3">
-        <h2 className="text-xl">المنتجات</h2>
-        <p className="text-sm text-muted-foreground">رسوم التوصيل: {money(store.delivery_fee)}</p>
+      {/* رأس قائمة الطعام */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b pb-3">
+        <div>
+          <h2 className="text-xl font-bold flex items-center gap-2 text-foreground">
+            <UtensilsCrossed className="size-5 text-primary" />
+            قائمة المنتجات والأصناف
+          </h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            إجمالي الأصناف: <strong className="text-foreground">{products.length}</strong> • رسوم التوصيل المقررة: <strong className="text-primary">{money(store.delivery_fee)}</strong>
+          </p>
+        </div>
       </div>
-      {groups.length > 1 && (
-        <nav aria-label="أقسام المنتجات" className="mb-7 flex gap-2 overflow-x-auto pb-2">
-          {groups.map((group) => (
-            <a
-              key={group.id}
-              href={`#product-section-${group.id}`}
-              className="shrink-0 rounded-full border bg-card px-4 py-2 text-sm font-medium text-primary"
+
+      {/* شريط الفئات العرضي الأفقي القابل للتمرير في أول المنيو */}
+      {groups.length > 0 && (
+        <div className="sticky top-14 z-30 -mx-4 mb-7 border-b bg-background/95 px-4 py-2.5 backdrop-blur-md shadow-xs sm:mx-0 sm:rounded-2xl sm:border sm:px-3">
+          <nav
+            ref={navRef}
+            aria-label="فئات المنيو"
+            className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth"
+          >
+            {/* زر عرض الكل */}
+            <button
+              type="button"
+              onClick={() => handleSelectSection("all")}
+              className={`shrink-0 flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition-all ${
+                activeSectionId === "all"
+                  ? "bg-primary text-primary-foreground shadow-sm scale-105"
+                  : "bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground border border-border/40"
+              }`}
             >
-              {group.name} ({group.products.length})
-            </a>
-          ))}
-        </nav>
+              <Layers className="size-3.5" />
+              <span>الكل</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                activeSectionId === "all" ? "bg-primary-foreground/20 text-primary-foreground" : "bg-background text-muted-foreground"
+              }`}>
+                {products.length}
+              </span>
+            </button>
+
+            {/* أزرار الفئات المخصصة في شريط العرض */}
+            {groups.map((group) => {
+              const isActive = activeSectionId === group.id;
+              return (
+                <button
+                  key={group.id}
+                  type="button"
+                  onClick={() => handleSelectSection(group.id)}
+                  className={`shrink-0 flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold transition-all ${
+                    isActive
+                      ? "bg-primary text-primary-foreground font-bold shadow-sm scale-105"
+                      : "bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground border border-border/40"
+                  }`}
+                >
+                  <span>{group.name}</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    isActive ? "bg-primary-foreground/20 text-primary-foreground" : "bg-background text-muted-foreground"
+                  }`}>
+                    {group.products.length}
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
       )}
-      <div className="space-y-9">
+
+      {/* المنتجات مجمعة تحت كل فئة خاصة بها */}
+      <div className="space-y-10">
         {groups.map((group) => (
-          <section key={group.id} id={`product-section-${group.id}`} className="scroll-mt-28">
-            <div className="mb-4 flex items-center gap-3 border-b pb-3">
-              <h3 className="text-lg font-semibold">{group.name}</h3>
-              <span className="text-sm text-muted-foreground">{group.products.length} منتجات</span>
+          <section
+            key={group.id}
+            id={`product-section-${group.id}`}
+            className="scroll-mt-32 space-y-4"
+          >
+            {/* عنوان الفئة وعدد منتجاتها */}
+            <div className="flex items-center justify-between border-b pb-2.5">
+              <div className="flex items-center gap-2.5">
+                <span className="size-2.5 rounded-full bg-primary" />
+                <h3 className="text-lg font-bold text-foreground">{group.name}</h3>
+              </div>
+              <Badge variant="outline" className="text-xs font-semibold">
+                {group.products.length} صنف
+              </Badge>
             </div>
+
+            {/* قائمة منتجات هذه الفئة */}
             <div className="grid gap-4 md:grid-cols-2">
               {group.products.map((product) => {
                 const itemInCart = cart.items.find((i) => i.product_id === product.id);
                 const qty = itemInCart?.qty ?? 0;
                 return (
                   <article
-                    className="flex min-w-0 items-center gap-4 rounded-xl border bg-card p-4 shadow-soft transition-all"
+                    className="flex min-w-0 items-center gap-4 rounded-2xl border bg-card p-4 shadow-soft transition-all hover:border-primary/40"
                     key={product.id}
                   >
                     {product.image_url && (
@@ -69,15 +148,19 @@ export function StoreProducts({
                         src={product.image_url}
                         alt={product.name}
                         loading="lazy"
-                        className="size-20 shrink-0 rounded-lg object-cover"
+                        className="size-20 shrink-0 rounded-xl object-cover border"
                       />
                     )}
                     <div className="min-w-0 flex-1">
-                      <h4 className="break-words font-sans font-semibold text-base">{product.name}</h4>
-                      <p className="my-1.5 text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                        {product.description}
-                      </p>
-                      <p className="font-bold text-primary text-sm">{money(product.price)}</p>
+                      <h4 className="break-words font-sans font-bold text-base text-foreground">
+                        {product.name}
+                      </h4>
+                      {product.description && (
+                        <p className="my-1.5 text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                          {product.description}
+                        </p>
+                      )}
+                      <p className="font-bold text-primary text-sm mt-1">{money(product.price)}</p>
                     </div>
 
                     {/* زر الإضافة أو عداد الكمية */}
@@ -85,7 +168,7 @@ export function StoreProducts({
                       {qty === 0 ? (
                         <Button
                           size="icon"
-                          className="size-9 rounded-xl shadow-sm transition-transform active:scale-95"
+                          className="size-9 rounded-xl shadow-sm transition-transform active:scale-95 bg-primary text-primary-foreground hover:bg-primary/90"
                           aria-label={`إضافة ${product.name} للسلة`}
                           title={`إضافة ${product.name}`}
                           disabled={!product.is_available || !store.is_open}
@@ -145,7 +228,13 @@ export function StoreProducts({
           </section>
         ))}
       </div>
-      {!products.length && <p className="py-12 text-center text-muted-foreground">لا توجد منتجات بعد</p>}
+
+      {!products.length && (
+        <div className="py-16 text-center text-muted-foreground border rounded-2xl bg-card">
+          <UtensilsCrossed className="mx-auto mb-3 size-12 text-muted-foreground/50" />
+          <p className="text-base font-semibold">لا توجد منتجات مسجلة في هذا المتجر بعد</p>
+        </div>
+      )}
     </div>
   );
 }

@@ -29,6 +29,8 @@ import {
   Award,
   Calendar,
   MessageCircle,
+  Layers,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -40,8 +42,9 @@ import { StatusBadge } from "@/components/AppShell";
 import { Field, SelectField, ToggleField } from "./fields";
 import { ImageUploadField } from "./ImageUpload";
 import { CatalogPicker } from "./CatalogPicker";
-import { dashboardQuery, dashboardProductsQuery, dashboardOrderItemsQuery, type DashboardData, type DashboardProduct } from "./queries";
-import { saveStore, saveProduct, deleteProduct, approveStore, updateRequest, transferStoreOwnership } from "@/lib/dashboard.functions";
+import { dashboardQuery, dashboardProductsQuery, dashboardSectionsQuery, dashboardOrderItemsQuery, type DashboardData, type DashboardProduct, type DashboardSection } from "./queries";
+import { saveStore, saveProduct, deleteProduct, saveSection, deleteSection, addSuggestedSections, approveStore, updateRequest, transferStoreOwnership } from "@/lib/dashboard.functions";
+import { groupProductsBySection, suggestedSectionsFor, type StoreSection } from "@/lib/product-sections";
 import { allowedNext, earnings, type LedgerRow, type RequestKind } from "@/lib/dashboard-rules";
 import { money, dateAr, STATUS_LABELS } from "@/lib/labels";
 import { cleanOrderNotes } from "@/lib/utils";
@@ -119,9 +122,15 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
   const doSaveStore = useServerFn(saveStore);
   const doSaveProduct = useServerFn(saveProduct);
   const doDelete = useServerFn(deleteProduct);
+  const doSaveSection = useServerFn(saveSection);
+  const doDeleteSection = useServerFn(deleteSection);
+  const doAddSuggestedSections = useServerFn(addSuggestedSections);
   const doApproval = useServerFn(approveStore);
   const doTransfer = useServerFn(transferStoreOwnership);
   const doUpdate = useServerFn(updateRequest);
+
+  const [sectionDialogOpen, setSectionDialogOpen] = useState(false);
+  const [activeSectionFilter, setActiveSectionFilter] = useState<string>("all");
 
   async function execute(action: () => Promise<unknown>, close: () => void) {
     setBusy(true);
@@ -143,8 +152,10 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
 
   const [period, setPeriod] = useState<"today" | "week" | "month" | "year" | "all">("all");
   const productQuery = useQuery({ ...dashboardProductsQuery(store?.id ?? ''), enabled: !!store && (tab === 'products' || catalogOpen || productEdit !== null) });
+  const sectionsQuery = useQuery({ ...dashboardSectionsQuery(store?.id ?? ''), enabled: !!store && (tab === 'products' || catalogOpen || productEdit !== null || sectionDialogOpen) });
   const itemQuery = useQuery({ ...dashboardOrderItemsQuery(detail?.id ?? '', admin), enabled: detail?.kind === 'orders' });
   const allProducts = productQuery.data ?? [];
+  const sections = sectionsQuery.data ?? [];
   const allTasks = tasksFrom(data);
   const tasks = allTasks.filter(t => admin || t.store_id === store?.id);
   const totals = earnings(tasks);
@@ -155,6 +166,16 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
   const storeName = (id: string) => data.stores.find(s => s.id === id)?.name ?? "متجر";
   const selectedDetail = detail ? tasks.find(t => t.id === detail.id && t.kind === detail.kind) ?? detail : null;
   const currentDetail = selectedDetail?.kind === "orders" ? { ...selectedDetail, items: itemQuery.data ?? [] } : selectedDetail;
+
+  const groups = groupProductsBySection(products, sections);
+  const suggestions = store ? suggestedSectionsFor(store.category) : [];
+  const missingSuggestions = suggestions.filter(name => !sections.some(s => s.name === name));
+  const displayGroups =
+    activeSectionFilter === "all"
+      ? groups
+      : activeSectionFilter === "unsectioned"
+      ? groups.filter(g => g.id === "other")
+      : groups.filter(g => g.id === activeSectionFilter);
 
   // 1. حساب تقارير الأرباح والدخل حسب الفترة المحددة (يومي / أسبوعي / شهري / سنوي)
   const now = new Date();
@@ -233,6 +254,7 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
     e.preventDefault();
     if (!store) return;
     const form = new FormData(e.currentTarget);
+    const secId = String(form.get("section_id") ?? "").trim();
     execute(
       () =>
         doSaveProduct({
@@ -245,6 +267,7 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
             is_available: form.has("is_available"),
             image_url: String(form.get("image_url") ?? ""),
             stock_qty: form.get("stock_qty") === "" ? null : Number(form.get("stock_qty")),
+            section_id: secId || null,
           },
         }),
       () => setProductEdit(null),
@@ -725,44 +748,169 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
               <h2 className="text-lg font-bold">قائمة المنتجات والمنيو ({products.length})</h2>
               {store && <p className="text-xs text-muted-foreground">متجر: {store.name}</p>}
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="secondary" disabled={!store || !productQuery.data} onClick={() => setCatalogOpen(true)}>
-                <ClipboardList className="size-4 ml-1" /> من الكتالوج الجاهز
+            <div className="flex flex-wrap items-center gap-2">
+              {missingSuggestions.length > 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={busy || !store}
+                  className="gap-1.5 text-xs"
+                  onClick={() => {
+                    if (!store) return;
+                    execute(
+                      () => doAddSuggestedSections({ data: { store_id: store.id } }),
+                      () => toast.success("تمت إضافة الفئات المقترحة بنجاح"),
+                    );
+                  }}
+                >
+                  <Sparkles className="size-3.5 text-amber-500" />
+                  الفئات المقترحة ({missingSuggestions.length})
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={busy || !store}
+                className="gap-1.5 text-xs"
+                onClick={() => setSectionDialogOpen(true)}
+              >
+                <Layers className="size-3.5 text-primary" />
+                + إضافة فئة
               </Button>
-              <Button disabled={!store} onClick={() => setProductEdit("new")}>
-                <Plus className="size-4 ml-1" /> إضافة منتج
+              <Button variant="secondary" size="sm" disabled={!store || !productQuery.data} onClick={() => setCatalogOpen(true)}>
+                <ClipboardList className="size-3.5 ml-1" /> من الكتالوج الجاهز
+              </Button>
+              <Button size="sm" disabled={!store} onClick={() => setProductEdit("new")}>
+                <Plus className="size-3.5 ml-1" /> إضافة منتج
               </Button>
             </div>
           </div>
-          <div className="divide-y border-y">
-            {products.map(p => (
-              <div className="flex flex-wrap items-center justify-between gap-3 py-4" key={p.id}>
-                <div className="flex items-center gap-3">
-                  {p.image_url ? (
-                    <img src={p.image_url} alt="" loading="lazy" className="size-12 rounded object-cover" />
-                  ) : (
-                    <div className="grid size-12 place-items-center rounded bg-muted">
-                      <Package className="size-5 text-muted-foreground" />
-                    </div>
-                  )}
-                  <div>
-                    <h3 className="font-sans font-semibold">{p.name}</h3>
-                    <p className="mt-1 text-xs text-muted-foreground">{p.description}</p>
-                  </div>
+
+          {/* شريط الفئات العرضي الأفقي فوق أول المنيو */}
+          {store && (
+            <div className="mb-6 rounded-2xl border bg-card/60 backdrop-blur p-3 shadow-soft">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Layers className="size-4 text-primary" />
+                  <span className="text-xs font-bold text-foreground">فئات المنيو</span>
+                  <span className="text-[11px] text-muted-foreground">({sections.length} فئة مخصصة)</span>
                 </div>
-                <div className="flex items-center gap-4">
-                  <span className="font-semibold">{money(p.price)}</span>
-                  <span className={`text-xs font-bold ${p.is_available ? "text-success" : "text-muted-foreground"}`}>{p.is_available ? "متاح" : "غير متاح"}</span>
-                  <Button variant="ghost" size="icon" title="تعديل المنتج" aria-label={`تعديل ${p.name}`} onClick={() => setProductEdit(p)}>
-                    <Pencil />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="text-destructive" title="حذف المنتج" aria-label={`حذف ${p.name}`} onClick={() => setRemove(p)}>
-                    <Trash2 />
-                  </Button>
-                </div>
+                <p className="text-[11px] text-muted-foreground hidden sm:block">
+                  اضغط على الفئة للتصفية، أو زر الحذف لإلغائها
+                </p>
               </div>
-            ))}
-          </div>
+
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5 no-scrollbar">
+                {/* زر الكل */}
+                <button
+                  type="button"
+                  onClick={() => setActiveSectionFilter("all")}
+                  className={`shrink-0 flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition-all ${
+                    activeSectionFilter === "all"
+                      ? "bg-primary text-primary-foreground shadow-sm scale-105"
+                      : "bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground border border-border/50"
+                  }`}
+                >
+                  <span>كل المنتجات</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    activeSectionFilter === "all" ? "bg-primary-foreground/20 text-primary-foreground" : "bg-background text-muted-foreground"
+                  }`}>
+                    {products.length}
+                  </span>
+                </button>
+
+                {/* أزرار الفئات المخصصة في شريط العرض */}
+                {sections.map(section => {
+                  const count = products.filter(p => p.section_id === section.id).length;
+                  const isActive = activeSectionFilter === section.id;
+                  return (
+                    <div
+                      key={section.id}
+                      className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-all ${
+                        isActive
+                          ? "border-primary bg-primary text-primary-foreground font-bold shadow-sm scale-105"
+                          : "bg-background text-foreground hover:border-primary/40 border-border/60"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setActiveSectionFilter(isActive ? "all" : section.id)}
+                        className="flex items-center gap-1.5 text-xs focus:outline-none"
+                      >
+                        <span>{section.name}</span>
+                        <span
+                          className={`rounded-full px-1.5 py-0.2 text-[10px] font-mono ${
+                            isActive
+                              ? "bg-primary-foreground/20 text-primary-foreground"
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          {count}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`حذف فئة ${section.name}`}
+                        title={`حذف فئة ${section.name}`}
+                        className={`mr-0.5 rounded-full p-1 transition-colors ${
+                          isActive
+                            ? "text-primary-foreground/80 hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                            : "text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        }`}
+                        onClick={e => {
+                          e.stopPropagation();
+                          if (!store) return;
+                          if (confirm(`هل أنت متأكد من حذف فئة "${section.name}"؟ ستظل المنتجات محفوظة وتنتقل إلى قسم "أخرى".`)) {
+                            execute(
+                              () => doDeleteSection({ data: { id: section.id, store_id: store.id } }),
+                              () => {
+                                if (activeSectionFilter === section.id) setActiveSectionFilter("all");
+                                toast.success(`تم حذف فئة "${section.name}"`);
+                              },
+                            );
+                          }
+                        }}
+                      >
+                        <Trash2 className="size-3" />
+                      </button>
+                    </div>
+                  );
+                })}
+
+                {/* زر غير المصنف إذا وجد */}
+                {products.some(p => !p.section_id) && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveSectionFilter(activeSectionFilter === "unsectioned" ? "all" : "unsectioned")}
+                    className={`shrink-0 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${
+                      activeSectionFilter === "unsectioned"
+                        ? "bg-primary text-primary-foreground font-bold shadow-sm scale-105"
+                        : "bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground border border-border/50"
+                    }`}
+                  >
+                    <span>غير مصنف</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-background text-muted-foreground font-mono">
+                      {products.filter(p => !p.section_id).length}
+                    </span>
+                  </button>
+                )}
+
+                {/* زر إضافة فئة سريع في شريط الفئات */}
+                <button
+                  type="button"
+                  onClick={() => setSectionDialogOpen(true)}
+                  className="shrink-0 flex items-center gap-1 rounded-full border border-dashed border-primary/50 px-3 py-1 text-xs text-primary hover:bg-primary/5 transition-colors font-medium"
+                >
+                  <Plus className="size-3" />
+                  <span>فئة جديدة</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* المنتجات مجمعة تحت كل فئة خاصة بها */}
           {productQuery.isPending ? (
             <p role="status" className="py-8 text-center text-muted-foreground">
               جاري تحميل المنتجات...
@@ -774,8 +922,76 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
                 إعادة المحاولة
               </Button>
             </div>
+          ) : !products.length ? (
+            <Empty text="لا توجد منتجات مسجلة لهذا المتجر حتى الآن" />
           ) : (
-            !products.length && <Empty text="لا توجد منتجات مسجلة لهذا المتجر حتى الآن" />
+            <div className="space-y-6">
+              {displayGroups.map(group => (
+                <section key={group.id} className="rounded-2xl border bg-card p-4 shadow-soft">
+                  {/* عنوان الفئة */}
+                  <div className="mb-3 flex items-center justify-between border-b pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <span className="size-2 rounded-full bg-primary" />
+                      <h3 className="font-bold text-base text-foreground">{group.name}</h3>
+                      <Badge variant="secondary" className="text-xs font-semibold">
+                        {group.products.length} صنف
+                      </Badge>
+                    </div>
+                    {group.id !== "other" && store && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs text-destructive hover:bg-destructive/10"
+                        onClick={() => {
+                          if (confirm(`هل أنت متأكد من حذف فئة "${group.name}"؟ ستظل المنتجات محفوظة.`)) {
+                            execute(
+                              () => doDeleteSection({ data: { id: group.id, store_id: store.id } }),
+                              () => toast.success(`تم حذف فئة "${group.name}"`),
+                            );
+                          }
+                        }}
+                      >
+                        <Trash2 className="size-3.5 ml-1" /> حذف الفئة
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* قائمة منتجات هذه الفئة */}
+                  <div className="divide-y">
+                    {group.products.map(p => (
+                      <div className="flex flex-wrap items-center justify-between gap-3 py-3" key={p.id}>
+                        <div className="flex items-center gap-3 min-w-0">
+                          {p.image_url ? (
+                            <img src={p.image_url} alt="" loading="lazy" className="size-12 rounded-xl object-cover border shrink-0" />
+                          ) : (
+                            <div className="grid size-12 place-items-center rounded-xl bg-muted border shrink-0">
+                              <Package className="size-5 text-muted-foreground" />
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <h4 className="font-sans font-semibold text-sm truncate">{p.name}</h4>
+                            {p.description && <p className="mt-0.5 text-xs text-muted-foreground truncate">{p.description}</p>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="font-semibold text-sm">{money(p.price)}</span>
+                          <span className={`text-xs font-bold ${p.is_available ? "text-success" : "text-muted-foreground"}`}>
+                            {p.is_available ? "متاح" : "غير متاح"}
+                          </span>
+                          <Button variant="ghost" size="icon" className="size-8" title="تعديل المنتج" aria-label={`تعديل ${p.name}`} onClick={() => setProductEdit(p)}>
+                            <Pencil className="size-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="size-8 text-destructive" title="حذف المنتج" aria-label={`حذف ${p.name}`} onClick={() => setRemove(p)}>
+                            <Trash2 className="size-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
           )}
         </TabsContent>
 
@@ -1137,6 +1353,18 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
           <form key={editedProduct?.id ?? "new"} onSubmit={submitProduct} className="space-y-4">
             <Field name="name" label="اسم المنتج" required value={editedProduct?.name} />
             <Field name="description" label="وصف المنتج" value={editedProduct?.description} />
+            <SelectField
+              label="فئة / قسم المنتج"
+              name="section_id"
+              value={editedProduct?.section_id ?? (activeSectionFilter !== "all" && activeSectionFilter !== "unsectioned" ? activeSectionFilter : "")}
+            >
+              <option value="">بدون فئة (عام)</option>
+              {sections.map(s => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </SelectField>
             <ImageUploadField name="image_url" label="صورة المنتج" value={editedProduct?.image_url} />
             <Field name="price" label="السعر (ج.م)" type="number" required value={editedProduct?.price} />
             <Field name="stock_qty" label="الكمية المتاحة (اتركها فارغة لو متوفر دائمًا)" type="number" value={editedProduct?.stock_qty ?? ""} />
@@ -1145,6 +1373,58 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
               <Save />
               حفظ المنتج
             </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* حوار إضافة فئة جديدة للمنيو */}
+      <Dialog
+        open={sectionDialogOpen}
+        onOpenChange={open => {
+          if (!open && !busy) setSectionDialogOpen(false);
+        }}
+      >
+        <DialogContent>
+          <DialogTitle>إضافة فئة جديدة للمنيو</DialogTitle>
+          <DialogDescription>{store?.name} • أدخل اسم الفئة لتظهر في الشريط العرضي للمنيو وتنظيم المنتجات تحتها.</DialogDescription>
+          <form
+            onSubmit={e => {
+              e.preventDefault();
+              if (!store) return;
+              const form = new FormData(e.currentTarget);
+              const name = String(form.get("name") ?? "").trim();
+              if (!name) return;
+              execute(
+                () =>
+                  doSaveSection({
+                    data: {
+                      store_id: store.id,
+                      name,
+                      sort_order: (sections.length + 1) * 10,
+                    },
+                  }),
+                () => {
+                  setSectionDialogOpen(false);
+                  toast.success(`تمت إضافة فئة "${name}" بنجاح`);
+                },
+              );
+            }}
+            className="space-y-4"
+          >
+            <Field
+              name="name"
+              label="اسم الفئة"
+              required
+            />
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" disabled={busy} onClick={() => setSectionDialogOpen(false)}>
+                إلغاء
+              </Button>
+              <Button type="submit" disabled={busy}>
+                <Save className="size-4 ml-1" />
+                حفظ الفئة
+              </Button>
+            </div>
           </form>
         </DialogContent>
       </Dialog>

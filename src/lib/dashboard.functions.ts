@@ -306,6 +306,42 @@ export const addSuggestedSections = createServerFn({ method: "POST" })
     return { success: true };
   });
 
+export const deleteSection = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({ id: z.string().uuid(), store_id: z.string().uuid() }))
+  .handler(async ({ context, data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const roleCheck = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
+    const isAdmin = !!roleCheck.data;
+
+    if (!isAdmin) {
+      const store = await context.supabase
+        .from("stores")
+        .select("id")
+        .eq("id", data.store_id)
+        .eq("owner_id", context.userId)
+        .maybeSingle();
+      if (store.error || !store.data) throw new Error("لا تملك صلاحية حذف أقسام هذا المتجر");
+    }
+
+    const dbClient = isAdmin ? supabaseAdmin : context.supabase;
+    // Unassign products from this section first so products remain safe
+    await dbClient
+      .from("products")
+      .update({ section_id: null })
+      .eq("section_id", data.id)
+      .eq("store_id", data.store_id);
+
+    const res = await dbClient
+      .from("store_sections")
+      .delete()
+      .eq("id", data.id)
+      .eq("store_id", data.store_id);
+
+    if (res.error) throw new Error(res.error.message);
+    return { ok: true };
+  });
+
 export const saveProduct = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(productInput)
