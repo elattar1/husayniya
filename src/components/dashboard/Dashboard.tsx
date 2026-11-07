@@ -305,7 +305,7 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-7 md:px-6 md:py-10">
+    <div className="mx-auto max-w-6xl px-4 pt-6 pb-32 md:px-6 md:pt-8 md:pb-20">
       {/* شريط العنوان والتحديث */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b pb-4">
         <div>
@@ -348,21 +348,21 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
 
       <Tabs dir="rtl" value={tab} onValueChange={onTab}>
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b pb-4">
-          <TabsList className="hidden lg:flex h-auto max-w-full flex-wrap bg-transparent p-0">
-            <TabsTrigger value="stores">
-              {admin ? <ShieldCheck className="ml-2 size-4" /> : <Store className="ml-2 size-4" />}
-              {admin ? "المتاجر والخدمات" : "المتجر"}
+          <TabsList className="flex h-auto max-w-full overflow-x-auto no-scrollbar gap-1.5 rounded-2xl bg-muted/60 p-1.5 sm:bg-transparent sm:p-0">
+            <TabsTrigger value="stores" className="rounded-xl px-3.5 py-2 text-xs font-semibold data-[state=active]:bg-background data-[state=active]:shadow-xs sm:data-[state=active]:bg-primary sm:data-[state=active]:text-primary-foreground">
+              {admin ? <ShieldCheck className="ml-1.5 size-4" /> : <Store className="ml-1.5 size-4" />}
+              {admin ? "المتاجر والخدمات" : "إدارة المتجر"}
             </TabsTrigger>
-            <TabsTrigger value="products">
-              <Package className="ml-2 size-4" />
+            <TabsTrigger value="products" className="rounded-xl px-3.5 py-2 text-xs font-semibold data-[state=active]:bg-background data-[state=active]:shadow-xs sm:data-[state=active]:bg-primary sm:data-[state=active]:text-primary-foreground">
+              <Package className="ml-1.5 size-4" />
               {admin ? "إدارة المنيو" : "المنتجات والمنيو"}
             </TabsTrigger>
-            <TabsTrigger value="orders">
-              <ClipboardList className="ml-2 size-4" />
+            <TabsTrigger value="orders" className="rounded-xl px-3.5 py-2 text-xs font-semibold data-[state=active]:bg-background data-[state=active]:shadow-xs sm:data-[state=active]:bg-primary sm:data-[state=active]:text-primary-foreground">
+              <ClipboardList className="ml-1.5 size-4" />
               الطلبات
             </TabsTrigger>
-            <TabsTrigger value="earnings">
-              <Wallet className="ml-2 size-4" />
+            <TabsTrigger value="earnings" className="rounded-xl px-3.5 py-2 text-xs font-semibold data-[state=active]:bg-background data-[state=active]:shadow-xs sm:data-[state=active]:bg-primary sm:data-[state=active]:text-primary-foreground">
+              <Wallet className="ml-1.5 size-4" />
               الأرباح
             </TabsTrigger>
           </TabsList>
@@ -573,6 +573,18 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
                           {s.owner_id ? "نقل الملكية" : "تعيين المالك"}
                         </Button>
 
+                        {/* زر تعديل بيانات المتجر بالكامل */}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 gap-1 text-xs font-semibold text-primary border-primary/30 hover:bg-primary/5"
+                          title="تعديل كافة بيانات المتجر"
+                          onClick={() => setStoreEdit(s)}
+                        >
+                          <Pencil className="size-3" />
+                          تعديل المتجر
+                        </Button>
+
                         {/* زر الاعتماد والعمولة */}
                         <Button size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={() => setApproval(s)}>
                           {s.is_active ? <Pencil className="size-3" /> : <Check className="size-3" />}
@@ -635,8 +647,8 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
                       معاينة كعميل
                     </Link>
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => setStoreEdit(store)} className="gap-1.5 text-xs font-semibold">
-                    <Pencil className="size-3.5" /> تعديل بيانات المتجر
+                  <Button variant="default" size="sm" onClick={() => setStoreEdit(store)} className="gap-1.5 text-xs font-bold shadow-sm">
+                    <Pencil className="size-3.5" /> تعديل كافة بيانات المتجر
                   </Button>
                 </div>
               </div>
@@ -644,15 +656,22 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
               {/* بطاقة تفاصيل المتجر ومتوسط وقت التحضير */}
               <div className="grid gap-6 md:grid-cols-2 rounded-xl border bg-card p-5 shadow-soft">
                 <div>
-                  <h3 className="mb-4 text-base font-bold">بيانات المتجر والاتصال</h3>
+                  <div className="flex items-center justify-between mb-4 border-b pb-2">
+                    <h3 className="text-base font-bold text-foreground">بيانات المتجر والاتصال</h3>
+                    <Button variant="ghost" size="sm" onClick={() => setStoreEdit(store)} className="h-7 text-xs text-primary gap-1">
+                      <Pencil className="size-3" /> تعديل
+                    </Button>
+                  </div>
                   <dl className="space-y-3.5 text-sm">
                     {[
                       ["الاسم", store.name],
-                      ["القسم", data.categories.find(c => c.slug === store.category)?.name],
-                      ["المنطقة", data.areas.find(a => a.id === store.area_id)?.name],
-                      ["العنوان", store.address],
-                      ["الهاتف", store.phone],
-                      ["حالة العمل", store.is_open ? "مفتوح للطلبات" : "مغلق مؤقتاً"],
+                      ["القسم والنشاط", data.categories.find(c => c.slug === store.category)?.name],
+                      ["المنطقة التابعة", data.areas.find(a => a.id === store.area_id)?.name],
+                      ["العنوان بالتفصيل", store.address],
+                      ["رقم هاتف التواصل", store.phone],
+                      ["وصف المتجر", store.description || "لم يتم تحديد وصف"],
+                      ["التخصص", store.specialty || "عام"],
+                      ["حالة العمل الحالية", store.is_open ? "مفتوح للطلبات" : "مغلق مؤقتاً"],
                     ].map(([label, value]) => (
                       <div key={label} className="flex justify-between gap-4 border-b pb-2.5">
                         <dt className="text-muted-foreground">{label}</dt>
@@ -662,8 +681,13 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
                   </dl>
                 </div>
                 <div>
-                  <h3 className="mb-4 text-base font-bold">الرسوم والاعتماد ومعدل التحضير</h3>
-                  <div className="space-y-3 text-sm">
+                  <div className="flex items-center justify-between mb-4 border-b pb-2">
+                    <h3 className="text-base font-bold text-foreground">الرسوم والاعتماد والوسائط</h3>
+                    <Button variant="ghost" size="sm" onClick={() => setStoreEdit(store)} className="h-7 text-xs text-primary gap-1">
+                      <Pencil className="size-3" /> تعديل
+                    </Button>
+                  </div>
+                  <div className="space-y-3.5 text-sm">
                     {/* مؤشر متوسط وقت التحضير في لوحة المطعم */}
                     <div className="rounded-xl border border-primary/20 bg-primary/5 p-3.5 flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
@@ -676,10 +700,42 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
                       <span className="text-base font-bold text-primary">{avgPrepMinutes} دقيقة</span>
                     </div>
 
-                    <p>رسوم التوصيل المقررة: <strong>{money(store.delivery_fee)}</strong></p>
-                    <p>رسوم الحجز (إن وجد): <strong>{money(store.booking_fee)}</strong></p>
-                    <p>نسبة العمولة: <strong>{store.commission_rate}٪</strong></p>
-                    <div className="rounded-lg border-r-4 border-primary bg-primary/5 p-3 text-xs leading-relaxed">
+                    <div className="flex justify-between gap-4 border-b pb-2.5">
+                      <span className="text-muted-foreground">رسوم التوصيل المقررة:</span>
+                      <strong className="text-primary font-bold">{money(store.delivery_fee)}</strong>
+                    </div>
+                    {store.booking_fee > 0 && (
+                      <div className="flex justify-between gap-4 border-b pb-2.5">
+                        <span className="text-muted-foreground">رسوم الحجز (إن وجد):</span>
+                        <strong className="text-primary font-bold">{money(store.booking_fee)}</strong>
+                      </div>
+                    )}
+                    <div className="flex justify-between gap-4 border-b pb-2.5">
+                      <span className="text-muted-foreground">نسبة العمولة:</span>
+                      <strong>{store.commission_rate}٪</strong>
+                    </div>
+
+                    {/* صور المتجر */}
+                    <div className="pt-1">
+                      <span className="text-xs text-muted-foreground block mb-2 font-medium">صور المتجر والشعار:</span>
+                      <div className="flex items-center gap-3">
+                        {store.logo_url ? (
+                          <img src={store.logo_url} alt="لوجو المتجر" className="size-12 rounded-xl object-cover border" />
+                        ) : (
+                          <div className="size-12 rounded-xl border border-dashed grid place-items-center text-[10px] text-muted-foreground">بدون لوجو</div>
+                        )}
+                        {store.banner_url ? (
+                          <img src={store.banner_url} alt="بانر المتجر" className="h-12 w-28 rounded-xl object-cover border" />
+                        ) : (
+                          <div className="h-12 w-28 rounded-xl border border-dashed grid place-items-center text-[10px] text-muted-foreground">بدون غلاف</div>
+                        )}
+                        <Button variant="outline" size="sm" onClick={() => setStoreEdit(store)} className="h-8 text-xs mr-auto">
+                          تغيير الصور
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border-r-4 border-primary bg-primary/5 p-3 text-xs leading-relaxed mt-3">
                       {store.is_active ? "تم اعتماد المتجر بالكامل ويمكن للعملاء الطلب منه." : "متجرك محفوظ وبانتظار مراجعة الإدارة قبل ظهوره للعملاء."}
                     </div>
                   </div>

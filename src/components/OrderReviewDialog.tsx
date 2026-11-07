@@ -52,7 +52,13 @@ export function OrderReviewDialog({
     onSuccess: () => {
       if (orderId) {
         try {
-          localStorage.setItem(`order_reviewed_${orderId}`, "true");
+          localStorage.setItem(
+            `order_reviewed_${orderId}`,
+            JSON.stringify({
+              storeRating,
+              driverRating: hasDriver ? driverRating : null,
+            })
+          );
         } catch {}
       }
       qc.invalidateQueries({ queryKey: ["customer-orders"] });

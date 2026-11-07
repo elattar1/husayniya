@@ -315,9 +315,6 @@ export function InAppChatNotifier() {
                   <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
                     {activeBanner.body}
                   </p>
-                  <p className="text-[11px] font-semibold text-primary pt-0.5 flex items-center gap-1">
-                    <span>اسحب لأسفل لفتح المحادثة ⬇️ • اسحب لأعلى للإغلاق ⬆️</span>
-                  </p>
                 </div>
               </div>
 

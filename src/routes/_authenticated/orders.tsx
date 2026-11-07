@@ -39,6 +39,21 @@ export const Route = createFileRoute('/_authenticated/orders')({
   notFoundComponent: CustomerNotFound,
 });
 
+function getOrderReview(orderId: string): { storeRating: number; driverRating?: number | null } | null {
+  try {
+    const raw = localStorage.getItem(`order_reviewed_${orderId}`);
+    if (!raw) return null;
+    if (raw === 'true') return { storeRating: 5 };
+    const parsed = JSON.parse(raw);
+    return {
+      storeRating: typeof parsed.storeRating === 'number' ? parsed.storeRating : 5,
+      driverRating: typeof parsed.driverRating === 'number' ? parsed.driverRating : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function Orders() {
   const { data } = useSuspenseQuery(customerOrdersQuery);
   const { data: catalog } = useSuspenseQuery(catalogQuery);
@@ -49,6 +64,7 @@ function Orders() {
   const [busy, setBusy] = useState('');
   const [chatOrderId, setChatOrderId] = useState<string | null>(chat || null);
   const [reviewOrder, setReviewOrder] = useState<any | null>(null);
+  const [reviewsVersion, setReviewsVersion] = useState(0);
 
   useEffect(() => {
     if (chat) {
@@ -56,14 +72,18 @@ function Orders() {
     }
   }, [chat]);
 
-  // Auto-prompt rating dialog if there is a freshly delivered order not yet reviewed
+  // Auto-prompt rating dialog ONLY ONCE after an order is delivered
   useEffect(() => {
     const ordersList = data?.orders ?? [];
     const delivered = ordersList.find((o) => o.status === 'delivered');
     if (delivered) {
       try {
-        const reviewed = localStorage.getItem(`order_reviewed_${delivered.id}`);
-        if (!reviewed) {
+        const promptKey = `order_rating_prompted_${delivered.id}`;
+        const reviewKey = `order_reviewed_${delivered.id}`;
+        const hasPrompted = localStorage.getItem(promptKey);
+        const hasReviewed = localStorage.getItem(reviewKey);
+        if (!hasPrompted && !hasReviewed) {
+          localStorage.setItem(promptKey, 'true');
           setReviewOrder(delivered);
         }
       } catch {}
@@ -229,17 +249,47 @@ function Orders() {
 
               {/* أزرار الإجراءات السريعة (المحادثة الفورية، التقييم، وإلغاء الطلب) */}
               <div className="mt-4 flex flex-wrap items-center gap-2">
-                {r.kind === 'orders' && (r.status === 'delivered' || r.status === 'completed') && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-2 border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 font-bold"
-                    onClick={() => setReviewOrder(r)}
-                  >
-                    <Star className="size-4 fill-amber-400 text-amber-400" />
-                    تقييم المتجر والتوصيل ⭐
-                  </Button>
-                )}
+                {r.kind === 'orders' && (r.status === 'delivered' || r.status === 'completed') && (() => {
+                  const review = getOrderReview(r.id);
+                  if (review) {
+                    return (
+                      <div className="flex items-center gap-1.5 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-1 text-xs">
+                        <span className="font-bold text-foreground flex items-center gap-1">
+                          <Star className="size-3.5 fill-amber-400 text-amber-400" />
+                          تقييمك:
+                        </span>
+                        <div className="flex items-center gap-0.5" dir="ltr">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Star
+                              key={star}
+                              className={`size-3.5 ${
+                                star <= review.storeRating
+                                  ? 'fill-amber-400 text-amber-400'
+                                  : 'text-muted-foreground/30'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                        {typeof review.driverRating === 'number' && review.driverRating > 0 && (
+                          <span className="text-[11px] text-muted-foreground border-r pr-2 mr-1">
+                            (التوصيل: {review.driverRating} ⭐)
+                          </span>
+                        )}
+                      </div>
+                    );
+                  }
+                  return (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-2 border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 font-bold"
+                      onClick={() => setReviewOrder(r)}
+                    >
+                      <Star className="size-4 fill-amber-400 text-amber-400" />
+                      تقييم المتجر والتوصيل ⭐
+                    </Button>
+                  );
+                })()}
 
                 {r.kind === 'orders' && r.status !== 'cancelled' && (
                   r.status === 'delivered' || r.status === 'completed' ? (
@@ -343,7 +393,19 @@ function Orders() {
         storeName={catalog?.stores?.find((s) => s.id === reviewOrder?.store_id)?.name ?? "المتجر"}
         hasDriver={!!reviewOrder?.driver_id}
         open={!!reviewOrder}
-        onOpenChange={(open) => !open && setReviewOrder(null)}
+        onOpenChange={(open) => {
+          if (!open) {
+            if (reviewOrder?.id) {
+              try {
+                localStorage.setItem(`order_rating_prompted_${reviewOrder.id}`, 'true');
+              } catch {}
+            }
+            setReviewOrder(null);
+          }
+        }}
+        onReviewed={() => {
+          setReviewsVersion((v) => v + 1);
+        }}
       />
     </div>
   );

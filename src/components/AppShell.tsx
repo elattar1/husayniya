@@ -152,7 +152,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main>{children}</main>
+      <main className="min-h-screen pb-28 lg:pb-12">{children}</main>
 
       {/* الشريط السفلي للهواتف المحمولة: مخصص حسب الوضع النشط، مع بقاء حسابي أقصى الشمال دائمًا */}
       <nav className="glass-surface fixed inset-x-0 bottom-0 z-40 flex justify-around border-t py-1.5 px-1 lg:hidden">
@@ -182,16 +182,16 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* 2. وضع بوابة التاجر (مخصص للمحل) */}
         {appMode === "merchant" && (
           <>
-            <Link to="/provider" search={{ tab: "orders" }} className={navItem} activeProps={active}>
+            <Link to="/provider" search={{ tab: "orders" }} className={navItem} activeProps={active} activeOptions={{ includeSearch: true }}>
               <ClipboardList className="h-5 w-5" />الطلبات
             </Link>
-            <Link to="/provider" search={{ tab: "products" }} className={navItem} activeProps={active}>
+            <Link to="/provider" search={{ tab: "products" }} className={navItem} activeProps={active} activeOptions={{ includeSearch: true }}>
               <Package className="h-5 w-5" />المنيو
             </Link>
-            <Link to="/provider" search={{ tab: "stores" }} className={navItem} activeProps={active}>
+            <Link to="/provider" search={{ tab: "stores" }} className={navItem} activeProps={active} activeOptions={{ includeSearch: true }}>
               <Store className="h-5 w-5" />المتجر
             </Link>
-            <Link to="/provider" search={{ tab: "earnings" }} className={navItem} activeProps={active}>
+            <Link to="/provider" search={{ tab: "earnings" }} className={navItem} activeProps={active} activeOptions={{ includeSearch: true }}>
               <Wallet className="h-5 w-5" />الأرباح
             </Link>
           </>
@@ -200,13 +200,13 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* 3. وضع تطبيق السائق (مخصص للكابتن) */}
         {appMode === "driver" && (
           <>
-            <Link to="/delivery" search={{ tab: "current" }} className={navItem} activeProps={active}>
+            <Link to="/delivery" search={{ tab: "current" }} className={navItem} activeProps={active} activeOptions={{ includeSearch: true }}>
               <Truck className="h-5 w-5" />معي الآن
             </Link>
-            <Link to="/delivery" search={{ tab: "available" }} className={navItem} activeProps={active}>
+            <Link to="/delivery" search={{ tab: "available" }} className={navItem} activeProps={active} activeOptions={{ includeSearch: true }}>
               <PackageOpen className="h-5 w-5" />الرادار
             </Link>
-            <Link to="/delivery" search={{ tab: "wallet" }} className={navItem} activeProps={active}>
+            <Link to="/delivery" search={{ tab: "wallet" }} className={navItem} activeProps={active} activeOptions={{ includeSearch: true }}>
               <Wallet className="h-5 w-5" />المحفظة
             </Link>
           </>
@@ -215,19 +215,19 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* 4. وضع لوحة الإدارة (مخصص للمدير) */}
         {appMode === "admin" && (
           <>
-            <Link to="/admin" search={{ tab: "stores" }} className={navItem} activeProps={active}>
+            <Link to="/admin" search={{ tab: "stores" }} className={navItem} activeProps={active} activeOptions={{ includeSearch: true }}>
               <Store className="h-5 w-5" />المتاجر
             </Link>
-            <Link to="/admin" search={{ tab: "products" }} className={navItem} activeProps={active}>
+            <Link to="/admin" search={{ tab: "products" }} className={navItem} activeProps={active} activeOptions={{ includeSearch: true }}>
               <Package className="h-5 w-5" />المنيو
             </Link>
-            <Link to="/admin" search={{ tab: "orders" }} className={navItem} activeProps={active}>
+            <Link to="/admin" search={{ tab: "orders" }} className={navItem} activeProps={active} activeOptions={{ includeSearch: true }}>
               <ClipboardList className="h-5 w-5" />الطلبات
             </Link>
-            <Link to="/drivers" search={{ q: "" }} className={navItem} activeProps={active}>
+            <Link to="/drivers" search={{ q: "" }} className={navItem} activeProps={active} activeOptions={{ includeSearch: true }}>
               <Users className="h-5 w-5" />الأسطول
             </Link>
-            <Link to="/admin" search={{ tab: "earnings" }} className={navItem} activeProps={active}>
+            <Link to="/admin" search={{ tab: "earnings" }} className={navItem} activeProps={active} activeOptions={{ includeSearch: true }}>
               <Wallet className="h-5 w-5" />الخزينة
             </Link>
           </>
