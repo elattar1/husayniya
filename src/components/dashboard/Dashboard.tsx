@@ -150,6 +150,12 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
     }
   }
 
+  const [storeSearch, setStoreSearch] = useState("");
+  const [storeCategoryFilter, setStoreCategoryFilter] = useState("all");
+  const [menuSearch, setMenuSearch] = useState("");
+  const [orderSearch, setOrderSearch] = useState("");
+  const [earningsSearch, setEarningsSearch] = useState("");
+
   const [period, setPeriod] = useState<"today" | "week" | "month" | "year" | "all">("all");
   const productQuery = useQuery({ ...dashboardProductsQuery(store?.id ?? ''), enabled: !!store && (tab === 'products' || catalogOpen || productEdit !== null) });
   const sectionsQuery = useQuery({ ...dashboardSectionsQuery(store?.id ?? ''), enabled: !!store && (tab === 'products' || catalogOpen || productEdit !== null || sectionDialogOpen) });
@@ -160,9 +166,33 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
   const tasks = allTasks.filter(t => admin || t.store_id === store?.id);
   const totals = earnings(tasks);
   const pending = tasks.filter(t => !["delivered", "completed", "cancelled"].includes(t.status)).length;
-  const stores = data.stores.filter(s => `${s.name} ${s.phone ?? ""} ${(s as any).owner_email ?? ""}`.includes(search));
-  const products = allProducts.filter(p => p.store_id === store?.id && p.name.includes(search));
-  const visibleTasks = tasks.filter(t => `${t.id} ${t.phone} ${t.detail} ${data.stores.find(s => s.id === t.store_id)?.name}`.includes(search));
+
+  const stores = data.stores.filter(s => {
+    const q = storeSearch.toLowerCase().trim();
+    const matchesSearch = !q || `${s.name} ${s.phone ?? ""} ${(s as any).owner_email ?? ""} ${s.address ?? ""}`.toLowerCase().includes(q);
+    const matchesCategory = storeCategoryFilter === "all" || s.category === storeCategoryFilter;
+    return matchesSearch && matchesCategory;
+  });
+
+  const products = allProducts.filter(p => {
+    if (p.store_id !== store?.id) return false;
+    if (!menuSearch.trim()) return true;
+    const q = menuSearch.toLowerCase().trim();
+    return p.name.toLowerCase().includes(q) || (p.description ?? "").toLowerCase().includes(q);
+  });
+
+  const visibleTasks = tasks.filter(t => {
+    if (!orderSearch.trim()) return true;
+    const q = orderSearch.toLowerCase().trim();
+    return (
+      t.id.toLowerCase().includes(q) ||
+      t.phone.toLowerCase().includes(q) ||
+      t.detail.toLowerCase().includes(q) ||
+      (t.address && t.address.toLowerCase().includes(q)) ||
+      (data.stores.find(s => s.id === t.store_id)?.name ?? "").toLowerCase().includes(q)
+    );
+  });
+
   const storeName = (id: string) => data.stores.find(s => s.id === id)?.name ?? "متجر";
   const selectedDetail = detail ? tasks.find(t => t.id === detail.id && t.kind === detail.kind) ?? detail : null;
   const currentDetail = selectedDetail?.kind === "orders" ? { ...selectedDetail, items: itemQuery.data ?? [] } : selectedDetail;
@@ -347,31 +377,6 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
       </div>
 
       <Tabs dir="rtl" value={tab} onValueChange={onTab}>
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b pb-4">
-          <TabsList className="flex h-auto max-w-full overflow-x-auto no-scrollbar gap-1.5 rounded-2xl bg-muted/60 p-1.5 sm:bg-transparent sm:p-0">
-            <TabsTrigger value="stores" className="rounded-xl px-3.5 py-2 text-xs font-semibold data-[state=active]:bg-background data-[state=active]:shadow-xs sm:data-[state=active]:bg-primary sm:data-[state=active]:text-primary-foreground">
-              {admin ? <ShieldCheck className="ml-1.5 size-4" /> : <Store className="ml-1.5 size-4" />}
-              {admin ? "المتاجر والخدمات" : "إدارة المتجر"}
-            </TabsTrigger>
-            <TabsTrigger value="products" className="rounded-xl px-3.5 py-2 text-xs font-semibold data-[state=active]:bg-background data-[state=active]:shadow-xs sm:data-[state=active]:bg-primary sm:data-[state=active]:text-primary-foreground">
-              <Package className="ml-1.5 size-4" />
-              {admin ? "إدارة المنيو" : "المنتجات والمنيو"}
-            </TabsTrigger>
-            <TabsTrigger value="orders" className="rounded-xl px-3.5 py-2 text-xs font-semibold data-[state=active]:bg-background data-[state=active]:shadow-xs sm:data-[state=active]:bg-primary sm:data-[state=active]:text-primary-foreground">
-              <ClipboardList className="ml-1.5 size-4" />
-              الطلبات
-            </TabsTrigger>
-            <TabsTrigger value="earnings" className="rounded-xl px-3.5 py-2 text-xs font-semibold data-[state=active]:bg-background data-[state=active]:shadow-xs sm:data-[state=active]:bg-primary sm:data-[state=active]:text-primary-foreground">
-              <Wallet className="ml-1.5 size-4" />
-              الأرباح
-            </TabsTrigger>
-          </TabsList>
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute right-3 top-3 size-4 text-muted-foreground" />
-            <Input aria-label="بحث في اللوحة" placeholder="بحث بالاسم أو البريد أو الهاتف..." className="pr-9" value={search} onChange={e => onSearch(e.target.value)} />
-          </div>
-        </div>
-
         <TabsContent value="stores">
           <div className="mb-6 rounded-2xl border bg-card p-4 sm:p-5 shadow-soft">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -463,6 +468,71 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
               <h2 className="mb-4 text-lg font-bold">
                 كافة المتاجر ومقدمو الخدمات <span className="text-sm font-normal text-muted-foreground">({stores.length})</span>
               </h2>
+
+              {/* شريط البحث المخصص للمتاجر */}
+              <div className="relative mb-4">
+                <Search className="absolute right-3.5 top-3 size-4 text-muted-foreground" />
+                <Input
+                  aria-label="البحث عن متجر أو مقدم خدمة"
+                  placeholder="البحث عن متجر أو مقدم خدمة..."
+                  className="pr-10 h-10 rounded-xl bg-card border-border/60 shadow-xs text-sm"
+                  value={storeSearch}
+                  onChange={e => setStoreSearch(e.target.value)}
+                />
+                {storeSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setStoreSearch("")}
+                    className="absolute left-3 top-2.5 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    مسح
+                  </button>
+                )}
+              </div>
+
+              {/* شريط تصنيف فئات وأنشطة المتاجر */}
+              <div className="mb-5 flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+                <button
+                  type="button"
+                  onClick={() => setStoreCategoryFilter("all")}
+                  className={`shrink-0 flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition-all ${
+                    storeCategoryFilter === "all"
+                      ? "bg-primary text-primary-foreground shadow-sm scale-105"
+                      : "bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground border border-border/50"
+                  }`}
+                >
+                  <span>كل الأنشطة</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    storeCategoryFilter === "all" ? "bg-primary-foreground/20 text-primary-foreground" : "bg-background text-muted-foreground"
+                  }`}>
+                    {data.stores.length}
+                  </span>
+                </button>
+
+                {data.categories.map(c => {
+                  const count = data.stores.filter(s => s.category === c.slug).length;
+                  const isActive = storeCategoryFilter === c.slug;
+                  return (
+                    <button
+                      key={c.slug}
+                      type="button"
+                      onClick={() => setStoreCategoryFilter(isActive ? "all" : c.slug)}
+                      className={`shrink-0 flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                        isActive
+                          ? "bg-primary text-primary-foreground font-bold shadow-sm scale-105"
+                          : "bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground border border-border/50"
+                      }`}
+                    >
+                      <span>{c.name}</span>
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                        isActive ? "bg-primary-foreground/20 text-primary-foreground" : "bg-background text-muted-foreground"
+                      }`}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
               <div className="divide-y border-y">
                 {stores.map(s => {
                   const ownerEmail = (s as any).owner_email as string | null | undefined;
@@ -966,6 +1036,29 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
             </div>
           )}
 
+          {/* شريط البحث المخصص للمنيو بين فئات المنيو والعناصر */}
+          {store && (
+            <div className="relative mb-6">
+              <Search className="absolute right-3.5 top-3 size-4 text-muted-foreground" />
+              <Input
+                aria-label="البحث في المنيو"
+                placeholder="البحث في المنيو..."
+                className="pr-10 h-10 rounded-xl bg-card border-border/60 shadow-xs text-sm"
+                value={menuSearch}
+                onChange={e => setMenuSearch(e.target.value)}
+              />
+              {menuSearch && (
+                <button
+                  type="button"
+                  onClick={() => setMenuSearch("")}
+                  className="absolute left-3 top-2.5 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  مسح
+                </button>
+              )}
+            </div>
+          )}
+
           {/* المنتجات مجمعة تحت كل فئة خاصة بها */}
           {productQuery.isPending ? (
             <p role="status" className="py-8 text-center text-muted-foreground">
@@ -1086,6 +1179,27 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
             </div>
           </div>
 
+          {/* شريط البحث المخصص للطلبات */}
+          <div className="relative mb-5">
+            <Search className="absolute right-3.5 top-3 size-4 text-muted-foreground" />
+            <Input
+              aria-label="البحث في الطلبات"
+              placeholder="البحث في الطلبات (رقم الطلب، اسم العميل، الهاتف، العنوان)..."
+              className="pr-10 h-10 rounded-xl bg-card border-border/60 shadow-xs text-sm"
+              value={orderSearch}
+              onChange={e => setOrderSearch(e.target.value)}
+            />
+            {orderSearch && (
+              <button
+                type="button"
+                onClick={() => setOrderSearch("")}
+                className="absolute left-3 top-2.5 text-xs text-muted-foreground hover:text-foreground"
+              >
+                مسح
+              </button>
+            )}
+          </div>
+
           <div className="divide-y border-y">
             {visibleTasks.map(t => (
               <div key={`${t.kind}-${t.id}`} className="flex flex-wrap items-center justify-between gap-4 py-5">
@@ -1204,11 +1318,33 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
 
           <div className="rounded-xl border bg-card p-5 shadow-soft">
             <h3 className="mb-4 text-base font-bold">سجل العمليات المكتملة ({periodTotals.count})</h3>
+
+            {/* شريط البحث المخصص للخزينة وسجل العمليات */}
+            <div className="relative mb-4">
+              <Search className="absolute right-3.5 top-3 size-4 text-muted-foreground" />
+              <Input
+                aria-label="البحث برقم الطلب"
+                placeholder="البحث برقم الطلب..."
+                className="pr-10 h-10 rounded-xl bg-background border-border/60 shadow-xs text-sm"
+                value={earningsSearch}
+                onChange={e => setEarningsSearch(e.target.value)}
+              />
+              {earningsSearch && (
+                <button
+                  type="button"
+                  onClick={() => setEarningsSearch("")}
+                  className="absolute left-3 top-2.5 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  مسح
+                </button>
+              )}
+            </div>
+
             <div className="overflow-x-auto">
               <table className="w-full min-w-[560px] text-right text-sm">
                 <thead className="border-b bg-muted/50">
                   <tr>
-                    {["رقم الطلب", "المتجر", "القيمة الإجمالية", "العمولة", "الصافي المستحق"].map(h => (
+                    {["رقم الطلب", "المتجر", "القيمة الإجمالية", "العمولة", "الصافي المستحق", "تفاصيل الطلب"].map(h => (
                       <th className="p-3 font-semibold text-xs" key={h}>
                         {h}
                       </th>
@@ -1218,13 +1354,42 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
                 <tbody className="divide-y">
                   {periodTasks
                     .filter(t => earnings([t]).count > 0)
+                    .filter(t => {
+                      if (!earningsSearch.trim()) return true;
+                      const q = earningsSearch.toLowerCase().trim();
+                      return (
+                        t.id.toLowerCase().includes(q) ||
+                        storeName(t.store_id).toLowerCase().includes(q) ||
+                        t.phone.toLowerCase().includes(q)
+                      );
+                    })
                     .map(t => (
-                      <tr key={t.id} className="hover:bg-muted/30">
-                        <td className="p-3 font-mono text-xs">#{t.id.slice(0, 8)}</td>
+                      <tr key={t.id} className="hover:bg-muted/30 transition-colors">
+                        <td className="p-3">
+                          <button
+                            type="button"
+                            onClick={() => setDetail(t)}
+                            className="font-mono text-xs font-bold text-primary hover:underline inline-flex items-center gap-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 px-2.5 py-1 transition-colors cursor-pointer"
+                            title="انقر لعرض كافة تفاصيل الطلب في صفحة منبثقة"
+                          >
+                            <span>#{t.id.slice(0, 8)}</span>
+                            <ExternalLink className="size-3 opacity-70" />
+                          </button>
+                        </td>
                         <td className="p-3 font-medium">{storeName(t.store_id)}</td>
                         <td className="p-3 font-bold">{money(t.amount)}</td>
                         <td className="p-3 text-primary font-medium">{money(t.commission)}</td>
                         <td className="p-3 text-success font-bold">{money(t.amount - t.commission)}</td>
+                        <td className="p-3">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs font-semibold gap-1 text-primary hover:bg-primary/10"
+                            onClick={() => setDetail(t)}
+                          >
+                            عرض <ArrowLeft className="size-3" />
+                          </Button>
+                        </td>
                       </tr>
                     ))}
                 </tbody>

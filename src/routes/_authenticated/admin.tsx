@@ -26,12 +26,9 @@ function Admin() {
 
   return (
     <>
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 pt-4">
-        <Button asChild variant="outline">
-          <Link to="/drivers" search={{ q: "" }}>إدارة فريق الدليفري</Link>
-        </Button>
-        <Button variant="default" onClick={() => setComplaintsOpen(true)}>
-          <MessageSquareWarning className="ml-2 size-4" />
+      <div className="mx-auto flex max-w-6xl justify-end px-4 pt-4">
+        <Button variant="default" size="sm" onClick={() => setComplaintsOpen(true)} className="gap-2 font-bold shadow-soft">
+          <MessageSquareWarning className="size-4" />
           الشكاوى والاقتراحات
         </Button>
       </div>

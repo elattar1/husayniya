@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate, useLocation } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   Bell,
@@ -42,6 +42,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const cart = useCart();
   const { data: unread = 0 } = useUnread();
   const navigate = useNavigate();
+  const location = useLocation();
+  const currentPath = location.pathname;
+  const currentTab = String((location.search as any)?.tab || (currentPath.includes("/admin") || currentPath.includes("/provider") ? "stores" : ""));
 
   const navItem = "flex flex-col items-center justify-center gap-0.5 text-[11px] text-muted-foreground px-1.5 py-1 transition-colors min-w-[50px]";
   const active = { className: "text-primary font-bold" };
@@ -182,16 +185,32 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* 2. وضع بوابة التاجر (مخصص للمحل) */}
         {appMode === "merchant" && (
           <>
-            <Link to="/provider" search={{ tab: "orders" }} className={navItem} activeProps={active} activeOptions={{ includeSearch: true }}>
+            <Link
+              to="/provider"
+              search={{ tab: "orders" }}
+              className={`${navItem} ${currentPath.includes("/provider") && currentTab === "orders" ? "text-primary font-bold" : ""}`}
+            >
               <ClipboardList className="h-5 w-5" />الطلبات
             </Link>
-            <Link to="/provider" search={{ tab: "products" }} className={navItem} activeProps={active} activeOptions={{ includeSearch: true }}>
+            <Link
+              to="/provider"
+              search={{ tab: "products" }}
+              className={`${navItem} ${currentPath.includes("/provider") && currentTab === "products" ? "text-primary font-bold" : ""}`}
+            >
               <Package className="h-5 w-5" />المنيو
             </Link>
-            <Link to="/provider" search={{ tab: "stores" }} className={navItem} activeProps={active} activeOptions={{ includeSearch: true }}>
+            <Link
+              to="/provider"
+              search={{ tab: "stores" }}
+              className={`${navItem} ${currentPath.includes("/provider") && currentTab === "stores" ? "text-primary font-bold" : ""}`}
+            >
               <Store className="h-5 w-5" />المتجر
             </Link>
-            <Link to="/provider" search={{ tab: "earnings" }} className={navItem} activeProps={active} activeOptions={{ includeSearch: true }}>
+            <Link
+              to="/provider"
+              search={{ tab: "earnings" }}
+              className={`${navItem} ${currentPath.includes("/provider") && currentTab === "earnings" ? "text-primary font-bold" : ""}`}
+            >
               <Wallet className="h-5 w-5" />الأرباح
             </Link>
           </>
@@ -200,13 +219,25 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* 3. وضع تطبيق السائق (مخصص للكابتن) */}
         {appMode === "driver" && (
           <>
-            <Link to="/delivery" search={{ tab: "current" }} className={navItem} activeProps={active} activeOptions={{ includeSearch: true }}>
+            <Link
+              to="/delivery"
+              search={{ tab: "current" }}
+              className={`${navItem} ${currentPath.includes("/delivery") && currentTab === "current" ? "text-primary font-bold" : ""}`}
+            >
               <Truck className="h-5 w-5" />معي الآن
             </Link>
-            <Link to="/delivery" search={{ tab: "available" }} className={navItem} activeProps={active} activeOptions={{ includeSearch: true }}>
+            <Link
+              to="/delivery"
+              search={{ tab: "available" }}
+              className={`${navItem} ${currentPath.includes("/delivery") && currentTab === "available" ? "text-primary font-bold" : ""}`}
+            >
               <PackageOpen className="h-5 w-5" />الرادار
             </Link>
-            <Link to="/delivery" search={{ tab: "wallet" }} className={navItem} activeProps={active} activeOptions={{ includeSearch: true }}>
+            <Link
+              to="/delivery"
+              search={{ tab: "wallet" }}
+              className={`${navItem} ${currentPath.includes("/delivery") && currentTab === "wallet" ? "text-primary font-bold" : ""}`}
+            >
               <Wallet className="h-5 w-5" />المحفظة
             </Link>
           </>
@@ -215,19 +246,39 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* 4. وضع لوحة الإدارة (مخصص للمدير) */}
         {appMode === "admin" && (
           <>
-            <Link to="/admin" search={{ tab: "stores" }} className={navItem} activeProps={active} activeOptions={{ includeSearch: true }}>
+            <Link
+              to="/admin"
+              search={{ tab: "stores" }}
+              className={`${navItem} ${currentPath.includes("/admin") && currentTab === "stores" ? "text-primary font-bold" : ""}`}
+            >
               <Store className="h-5 w-5" />المتاجر
             </Link>
-            <Link to="/admin" search={{ tab: "products" }} className={navItem} activeProps={active} activeOptions={{ includeSearch: true }}>
+            <Link
+              to="/admin"
+              search={{ tab: "products" }}
+              className={`${navItem} ${currentPath.includes("/admin") && currentTab === "products" ? "text-primary font-bold" : ""}`}
+            >
               <Package className="h-5 w-5" />المنيو
             </Link>
-            <Link to="/admin" search={{ tab: "orders" }} className={navItem} activeProps={active} activeOptions={{ includeSearch: true }}>
+            <Link
+              to="/admin"
+              search={{ tab: "orders" }}
+              className={`${navItem} ${currentPath.includes("/admin") && currentTab === "orders" ? "text-primary font-bold" : ""}`}
+            >
               <ClipboardList className="h-5 w-5" />الطلبات
             </Link>
-            <Link to="/drivers" search={{ q: "" }} className={navItem} activeProps={active} activeOptions={{ includeSearch: true }}>
+            <Link
+              to="/drivers"
+              search={{ q: "" }}
+              className={`${navItem} ${currentPath.startsWith("/drivers") ? "text-primary font-bold" : ""}`}
+            >
               <Users className="h-5 w-5" />الأسطول
             </Link>
-            <Link to="/admin" search={{ tab: "earnings" }} className={navItem} activeProps={active} activeOptions={{ includeSearch: true }}>
+            <Link
+              to="/admin"
+              search={{ tab: "earnings" }}
+              className={`${navItem} ${currentPath.includes("/admin") && currentTab === "earnings" ? "text-primary font-bold" : ""}`}
+            >
               <Wallet className="h-5 w-5" />الخزينة
             </Link>
           </>
