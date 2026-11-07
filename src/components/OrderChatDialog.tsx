@@ -83,6 +83,21 @@ export function OrderChatDialog({ orderId, open, onOpenChange }: OrderChatDialog
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const prevCountRef = useRef<number>(0);
 
+  // Set active chat order in global window state so notifications know chat is open
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (open && orderId) {
+      (window as any).__HUSAYNIYA_ACTIVE_CHAT_ORDER_ID = orderId;
+    } else if (!open && (window as any).__HUSAYNIYA_ACTIVE_CHAT_ORDER_ID === orderId) {
+      (window as any).__HUSAYNIYA_ACTIVE_CHAT_ORDER_ID = null;
+    }
+    return () => {
+      if ((window as any).__HUSAYNIYA_ACTIVE_CHAT_ORDER_ID === orderId) {
+        (window as any).__HUSAYNIYA_ACTIVE_CHAT_ORDER_ID = null;
+      }
+    };
+  }, [open, orderId]);
+
   const queryKey = ["order-chat", orderId];
 
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery<OrderChatInfo>({
@@ -169,7 +184,7 @@ export function OrderChatDialog({ orderId, open, onOpenChange }: OrderChatDialog
   } else if (isStore) {
     otherPartyTitle = data?.customer?.name ? `العميل (${data.customer.name})` : "العميل";
     otherPartyPhone = data?.customer?.phone || null;
-    stageDescription = "تواصل مباشر مع العميل أثناء تجهيز الطلب";
+    stageDescription = isDriverStage ? "تم تسليم الطلب للكابتن (المحادثة منتهية)" : "تواصل مباشر مع العميل أثناء تجهيز الطلب";
     presets = STORE_TO_CUSTOMER_PRESETS;
   } else if (isDriver) {
     otherPartyTitle = data?.customer?.name ? `العميل (${data.customer.name})` : "العميل";
@@ -267,20 +282,21 @@ export function OrderChatDialog({ orderId, open, onOpenChange }: OrderChatDialog
                 </div>
               )}
 
-              {isCustomer && isDriverStage && (
-                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-950 dark:text-emerald-200 flex items-start gap-2 shadow-xs">
-                  <Bike className="size-4 shrink-0 text-emerald-600 mt-0.5" />
-                  <div>
-                    <p className="font-semibold text-emerald-700 dark:text-emerald-300">الطلب الآن مع كابتن التوصيل ({data.driver?.name || "الكابتن"})</p>
-                    <p className="text-[11px] opacity-90 mt-0.5 leading-relaxed">
-                      انتهى المتجر من التحضير واستلم الكابتن الطلب وهو في الطريق لتسليمه لك. يمكنك مراسلته لتنسيق مكان الاستلام بدقة.
-                    </p>
+              {/* Empty State for Driver (Clean fresh chat) */}
+              {isDriver && data.messages.length === 0 && (
+                <div className="h-full flex flex-col items-center justify-center text-muted-foreground text-center p-6 space-y-2">
+                  <div className="size-12 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                    <Bike className="size-6" />
                   </div>
+                  <h4 className="font-bold text-foreground text-sm">محادثة جديدة مع العميل</h4>
+                  <p className="text-xs max-w-xs text-muted-foreground">
+                    أهلاً بك يا كابتن! يمكنك التنسيق هنا مباشرة مع العميل حول العنوان وتفاصيل الاستلام بدقة.
+                  </p>
                 </div>
               )}
 
-              {/* Empty State */}
-              {data.messages.length === 0 && (
+              {/* General Empty State */}
+              {!isDriver && data.messages.length === 0 && (
                 <div className="h-full flex flex-col items-center justify-center text-muted-foreground text-center p-6 space-y-2">
                   <div className="size-12 rounded-full bg-primary/10 text-primary flex items-center justify-center">
                     <MessageCircle className="size-6" />
@@ -300,6 +316,12 @@ export function OrderChatDialog({ orderId, open, onOpenChange }: OrderChatDialog
                   minute: "2-digit",
                 });
 
+                // Check if this message marks the transition to the driver phase for the customer
+                const isTransitionPoint =
+                  isCustomer &&
+                  msg.stage === "driver" &&
+                  (idx === 0 || data.messages[idx - 1]?.stage !== "driver");
+
                 // Display role badge
                 const roleBadge = 
                   msg.sender_role === "store"
@@ -308,37 +330,55 @@ export function OrderChatDialog({ orderId, open, onOpenChange }: OrderChatDialog
                     ? `🛵 ${msg.sender_name || "كابتن التوصيل"}`
                     : msg.sender_role === "customer"
                     ? `👤 ${msg.sender_name || "العميل"}`
-                    : `🛡️ ${msg.sender_name || "الإدارة"}`;
+                    : `🛡️ ${msg.sender_name || "خدمات الحسينية"}`;
 
                 return (
-                  <div
-                    key={msg.id}
-                    className={`flex flex-col ${isMe ? "items-start" : "items-end"} gap-1`}
-                  >
-                    <div className="flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground">
-                      <span className="font-medium">
-                        {isMe ? "أنت" : roleBadge}
-                      </span>
-                      <span>•</span>
-                      <span>{formattedTime}</span>
-                    </div>
-
-                    <div
-                      className={`max-w-[82%] rounded-2xl px-4 py-2.5 text-sm shadow-sm break-words whitespace-pre-wrap leading-relaxed ${
-                        isMe
-                          ? "bg-primary text-primary-foreground rounded-tr-none"
-                          : "bg-card border text-foreground rounded-tl-none"
-                      }`}
-                    >
-                      {msg.message}
-                    </div>
-
-                    {isMe && (
-                      <div className="flex items-center gap-1 px-1 text-[10px] text-muted-foreground/70">
-                        <CheckCheck className="size-3 text-primary" />
-                        <span>تم الإرسال</span>
+                  <div key={msg.id} className="space-y-2">
+                    {/* Centered Transition Banner for Customer */}
+                    {isTransitionPoint && (
+                      <div className="my-4 flex items-center justify-center w-full">
+                        <div className="flex flex-col items-center text-center gap-1.5 rounded-2xl border-2 border-emerald-500/40 bg-emerald-500/10 p-3.5 shadow-xs max-w-sm">
+                          <div className="grid size-9 place-items-center rounded-xl bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
+                            <Bike className="size-5" />
+                          </div>
+                          <span className="font-bold text-xs text-emerald-800 dark:text-emerald-200">
+                            🛵 تم تحويل المحادثة الآن إلى كابتن التوصيل ({data.driver?.name || "الكابتن"})
+                          </span>
+                          <p className="text-[11px] text-muted-foreground leading-relaxed">
+                            المتجر أنهى التجهيز وسلّم الطلب للكابتن. يمكنك الآن التنسيق مباشرة مع الكابتن حول موقعك والتسليم.
+                          </p>
+                        </div>
                       </div>
                     )}
+
+                    <div className={`flex flex-col ${isMe ? "items-start" : "items-end"} gap-1`}>
+                      <div className="flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground">
+                        <span className="font-medium">
+                          {isMe ? "أنت" : roleBadge}
+                        </span>
+                        <span>•</span>
+                        <span>{formattedTime}</span>
+                      </div>
+
+                      <div
+                        className={`max-w-[82%] rounded-2xl px-4 py-2.5 text-sm shadow-sm break-words whitespace-pre-wrap leading-relaxed ${
+                          isMe
+                            ? "bg-primary text-primary-foreground rounded-tr-none"
+                            : msg.sender_id === "system"
+                            ? "bg-muted border border-primary/30 text-foreground text-center mx-auto"
+                            : "bg-card border text-foreground rounded-tl-none"
+                        }`}
+                      >
+                        {msg.message}
+                      </div>
+
+                      {isMe && (
+                        <div className="flex items-center gap-1 px-1 text-[10px] text-muted-foreground/70">
+                          <CheckCheck className="size-3 text-primary" />
+                          <span>تم الإرسال</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -348,7 +388,7 @@ export function OrderChatDialog({ orderId, open, onOpenChange }: OrderChatDialog
           )}
         </div>
 
-        {/* Quick Suggestion Presets & Input Bar, OR Locked Footer when delivered */}
+        {/* Footer: Locked if order completed/delivered OR if store was locked out after driver takeover */}
         {data?.status === "delivered" || data?.status === "completed" || data?.status === "cancelled" ? (
           <div className="p-4 border-t bg-muted/40 shrink-0 text-center space-y-1">
             <div className="flex items-center justify-center gap-2 text-xs font-bold text-foreground">
@@ -357,6 +397,16 @@ export function OrderChatDialog({ orderId, open, onOpenChange }: OrderChatDialog
             </div>
             <p className="text-[11px] text-muted-foreground">
               سجل الرسائل محفوظ لديك للاطلاع عليه في أي وقت.
+            </p>
+          </div>
+        ) : isStore && isDriverStage ? (
+          <div className="p-4 border-t bg-muted/40 shrink-0 text-center space-y-1">
+            <div className="flex items-center justify-center gap-2 text-xs font-bold text-foreground">
+              <Lock className="size-4 text-primary" />
+              <span>تم تسليم الطلب لكابتن التوصيل ({data?.driver?.name || "الكابتن"})</span>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              أُغلقت محادثة المتجر وانتقلت المحادثة الآن بين العميل وكابتن التوصيل لتنسيق الوصول.
             </p>
           </div>
         ) : (

@@ -531,7 +531,7 @@ export const updateRequest = createServerFn({ method: "POST" })
               .from("orders")
               .update({
                 status: data.status,
-                ...(data.status === "preparing" ? { picked_up_at: new Date().toISOString() } : {}),
+                ...(data.status === "on_the_way" ? { picked_up_at: new Date().toISOString() } : {}),
                 ...(data.status === "delivered" ? { payment_status: "paid_cash" } : {}),
               })
               .eq("id", data.id)
@@ -546,6 +546,16 @@ export const updateRequest = createServerFn({ method: "POST" })
               .select("id")
               .single();
     if (result.error) throw new Error(result.error.message);
+
+    if (data.kind === "orders") {
+      try {
+        const { notifyOrderStatusUpdate } = await import("@/lib/chat.functions");
+        await notifyOrderStatusUpdate(data.id, data.status);
+      } catch (e) {
+        console.error("notifyOrderStatusUpdate failed:", e);
+      }
+    }
+
     return result.data;
   });
 

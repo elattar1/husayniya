@@ -10,12 +10,14 @@ export interface ChatMessage {
   sender_name: string;
   message: string;
   created_at: string;
+  stage?: "store" | "driver";
 }
 
 export interface OrderChatInfo {
   orderId: string;
   status: string;
   chatStage: "store" | "driver"; // "store" during preparation, "driver" once picked up
+  isStoreClosed: boolean; // true if driver claimed/picked up and store chat is finished
   store: {
     id: string;
     name: string;
@@ -136,7 +138,7 @@ export const getOrderChat = createServerFn({ method: "POST" })
     }
 
     // Attempt to load messages from order_messages table or fallback from notes
-    let messages: ChatMessage[] = [];
+    let rawMessages: ChatMessage[] = [];
     try {
       const tblRes = await (supabaseAdmin.from("order_messages" as any) as any)
         .select("*")
@@ -144,7 +146,7 @@ export const getOrderChat = createServerFn({ method: "POST" })
         .order("created_at", { ascending: true });
 
       if (!tblRes.error && Array.isArray(tblRes.data) && tblRes.data.length > 0) {
-        messages = tblRes.data.map((m: any) => ({
+        rawMessages = tblRes.data.map((m: any) => ({
           id: String(m.id),
           order_id: String(m.order_id),
           sender_id: String(m.sender_id),
@@ -152,20 +154,39 @@ export const getOrderChat = createServerFn({ method: "POST" })
           sender_name: String(m.sender_name),
           message: String(m.message),
           created_at: String(m.created_at),
+          stage: m.stage || (m.sender_role === "driver" ? "driver" : m.sender_role === "store" ? "store" : undefined),
         }));
       } else {
         const parsed = parseMessagesFromNotes(order.notes);
-        messages = parsed.messages;
+        rawMessages = parsed.messages;
       }
     } catch {
       const parsed = parseMessagesFromNotes(order.notes);
-      messages = parsed.messages;
+      rawMessages = parsed.messages;
+    }
+
+    // Separation of chats:
+    // 1. Driver gets a fresh chat (only driver-phase messages, no private store/kitchen chat)
+    // 2. Store only sees store-phase messages (before delivery takeover)
+    // 3. Customer sees continuous thread with transition note
+    let visibleMessages: ChatMessage[] = [];
+    if (myRole === "driver") {
+      visibleMessages = rawMessages.filter(
+        (m) => m.stage === "driver" || m.sender_role === "driver"
+      );
+    } else if (myRole === "store") {
+      visibleMessages = rawMessages.filter(
+        (m) => m.stage === "store" || m.sender_role === "store" || (!m.stage && m.sender_role !== "driver")
+      );
+    } else {
+      visibleMessages = rawMessages;
     }
 
     return {
       orderId: order.id,
       status: order.status,
       chatStage,
+      isStoreClosed: isDriverStage,
       store: storeRow
         ? {
             id: storeRow.id,
@@ -184,7 +205,7 @@ export const getOrderChat = createServerFn({ method: "POST" })
       total: Number(order.total || 0),
       deliveryFee: Number(order.delivery_fee || 0),
       myRole,
-      messages,
+      messages: visibleMessages,
     };
   });
 
@@ -238,6 +259,11 @@ export const sendOrderChatMessage = createServerFn({ method: "POST" })
       ? "customer"
       : "admin";
 
+    // Strict stage enforcement: store cannot send messages once driver has claimed the order
+    if (senderRole === "store" && isDriverStage) {
+      throw new Error("تم تسليم الطلب لكابتن التوصيل؛ أُغلقت محادثة المتجر لهذا الطلب.");
+    }
+
     // Determine sender display name
     let senderName = "مستخدم";
     if (senderRole === "store") {
@@ -260,6 +286,7 @@ export const sendOrderChatMessage = createServerFn({ method: "POST" })
       sender_name: senderName,
       message: data.message,
       created_at: new Date().toISOString(),
+      stage: chatStage,
     };
 
     let savedInTable = false;
@@ -272,6 +299,7 @@ export const sendOrderChatMessage = createServerFn({ method: "POST" })
         sender_name: newMessage.sender_name,
         message: newMessage.message,
         created_at: newMessage.created_at,
+        stage: newMessage.stage,
       });
       if (!insertRes.error) {
         savedInTable = true;
@@ -355,3 +383,117 @@ export const sendOrderChatMessage = createServerFn({ method: "POST" })
 
     return { ok: true, message: newMessage };
   });
+
+/**
+ * Helper to post an automatic order status update message in the chat
+ * and deliver an on-screen alert + Web Push notification to the customer.
+ */
+export async function notifyOrderStatusUpdate(
+  orderId: string,
+  newStatus: string,
+  extra?: { driverName?: string; note?: string }
+): Promise<void> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { sendPushToUser } = await import("@/lib/push.functions");
+
+    const orderRes = await supabaseAdmin
+      .from("orders")
+      .select("id, customer_id, store_id, driver_id, status, notes, stores(name)")
+      .eq("id", orderId)
+      .maybeSingle();
+
+    if (!orderRes.data) return;
+    const order = orderRes.data;
+    const storeName = (order.stores as any)?.name ?? "المتجر";
+
+    let title = "تحديث في طلبك";
+    let message = "";
+
+    switch (newStatus) {
+      case "confirmed":
+        title = `✅ تم قبول وتأكيد طلبك من ${storeName}`;
+        message = `قام ${storeName} بتأكيد وقبول طلبك، وبدأ الاستعداد لتجهيزه.`;
+        break;
+      case "preparing":
+        title = `🍳 طلبك قيد التحضير الآن في ${storeName}`;
+        message = `يقوم ${storeName} بتحضير وتجهيز طلبك الآن بعناية.`;
+        break;
+      case "on_the_way":
+        const drName = extra?.driverName ? `الكابتن ${extra.driverName}` : "كابتن التوصيل";
+        title = `🛵 استلم ${drName} طلبك وهو في الطريق إليك`;
+        message = `تم تسليم الطلب من ${storeName} إلى ${drName} وهو الآن في الطريق إليك! تم تحويل المحادثة إلى الكابتن.`;
+        break;
+      case "delivered":
+        title = `🎉 تم تسليم طلبك بنجاح من ${storeName}`;
+        message = `تم تسليم الطلب وتحصيله بنجاح. شكراً لطلبك من ${storeName} عبر خدمات الحسينية! نرجو منك تقييم تجربتك ⭐`;
+        break;
+      case "cancelled":
+        title = `❌ تم إلغاء الطلب من ${storeName}`;
+        message = extra?.note || `تم إلغاء الطلب من قِبل ${storeName}.`;
+        break;
+      default:
+        title = `تحديث الطلب: ${newStatus}`;
+        message = `تم تحديث حالة طلبك إلى: ${newStatus}`;
+        break;
+    }
+
+    const stage: "store" | "driver" = (newStatus === "on_the_way" || newStatus === "delivered") ? "driver" : "store";
+
+    const sysMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      order_id: orderId,
+      sender_id: "system",
+      sender_role: "admin",
+      sender_name: "خدمات الحسينية (تحديث تلقائي)",
+      message,
+      created_at: new Date().toISOString(),
+      stage,
+    };
+
+    // 1. Insert chat message into table
+    try {
+      await (supabaseAdmin.from("order_messages" as any) as any).insert({
+        id: sysMessage.id,
+        order_id: sysMessage.order_id,
+        sender_id: sysMessage.sender_id,
+        sender_role: sysMessage.sender_role,
+        sender_name: sysMessage.sender_name,
+        message: sysMessage.message,
+        created_at: sysMessage.created_at,
+        stage: sysMessage.stage,
+      });
+    } catch {}
+
+    // 2. Persist in notes
+    try {
+      const { cleanNotes, messages } = parseMessagesFromNotes(order.notes);
+      const updatedMessages = [...messages, sysMessage];
+      const serialized = serializeMessagesToNotes(cleanNotes, updatedMessages);
+      await supabaseAdmin.from("orders").update({ notes: serialized }).eq("id", orderId);
+    } catch {}
+
+    // 3. Notification for on-screen top banner
+    const link = `/orders?filter=active&chat=${orderId}`;
+    try {
+      await supabaseAdmin.from("notifications").insert({
+        user_id: order.customer_id,
+        title,
+        body: message,
+        link,
+      });
+    } catch {}
+
+    // 4. Web Push Notification to phone
+    try {
+      await sendPushToUser(order.customer_id, {
+        title,
+        body: message,
+        path: link,
+        tag: `husayniya-order-${orderId}`,
+      });
+    } catch {}
+  } catch (e) {
+    console.error("notifyOrderStatusUpdate failed:", e);
+  }
+}

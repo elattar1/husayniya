@@ -187,6 +187,16 @@ export const cancelCustomerRequest = createServerFn({ method: 'POST' })
     if (!row.data || !canCustomerCancel(data.kind, row.data.status)) throw new Error('لا يمكن إلغاء الطلب في حالته الحالية');
     const result = await context.supabase.from(data.kind).update({ status: 'cancelled' }).eq('id', data.id).eq('customer_id', context.userId).eq('status', row.data.status).select('id').single();
     if (result.error) throw new Error('تعذر الإلغاء؛ حدّث الطلب وحاول مرة أخرى');
+
+    if (data.kind === "orders") {
+      try {
+        const { notifyOrderStatusUpdate } = await import("@/lib/chat.functions");
+        await notifyOrderStatusUpdate(data.id, "cancelled");
+      } catch (e) {
+        console.error("cancel notification error:", e);
+      }
+    }
+
     return result.data;
   });
 

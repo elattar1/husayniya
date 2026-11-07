@@ -40,6 +40,16 @@ export const claimOrder = createServerFn({ method: "POST" }).middleware([require
   .handler(async ({ context, data }) => {
     const r = await context.supabase.rpc("driver_claim_order", { _order_id: data.id });
     if (r.error) throw new Error(r.error.message);
+
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const dr = await supabaseAdmin.from("drivers").select("full_name").eq("user_id", context.userId).maybeSingle();
+      const { notifyOrderStatusUpdate } = await import("@/lib/chat.functions");
+      await notifyOrderStatusUpdate(data.id, "on_the_way", { driverName: dr.data?.full_name || undefined });
+    } catch (e) {
+      console.error("claimOrder notification error:", e);
+    }
+
     return { ok: true };
   });
 
@@ -48,6 +58,14 @@ export const completeOrder = createServerFn({ method: "POST" }).middleware([requ
   .handler(async ({ context, data }) => {
     const r = await context.supabase.rpc("driver_complete_order", { _order_id: data.id });
     if (r.error) throw new Error(r.error.message);
+
+    try {
+      const { notifyOrderStatusUpdate } = await import("@/lib/chat.functions");
+      await notifyOrderStatusUpdate(data.id, "delivered");
+    } catch (e) {
+      console.error("completeOrder notification error:", e);
+    }
+
     return { ok: true };
   });
 

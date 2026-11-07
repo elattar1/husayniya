@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { MessageSquare, X, Store, Bike, BellRing, Check } from "lucide-react";
+import { MessageSquare, X, Store, Bike, BellRing, Check, ChevronDown, ChevronUp } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/lib/auth";
@@ -59,6 +59,10 @@ export function InAppChatNotifier() {
   const seenNotificationIdsRef = useRef<Set<string>>(new Set());
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Touch gesture states for swipe down to open, swipe up to dismiss
+  const touchStartY = useRef<number | null>(null);
+  const [touchDeltaY, setTouchDeltaY] = useState(0);
+
   // Auto-register push if permission is granted, or prompt if default
   useEffect(() => {
     if (!user || typeof window === "undefined") return;
@@ -111,54 +115,13 @@ export function InAppChatNotifier() {
     } catch {}
   }
 
-  // Poll for notifications every 4 seconds when user is signed in
+  // Poll for notifications every 3.5 seconds when user is signed in
   const { data: notifications } = useQuery({
     queryKey: ["in-app-chat-notifications", user?.id],
     queryFn: () => getNotifs(),
     enabled: !!user,
-    refetchInterval: 4000,
+    refetchInterval: 3500,
   });
-
-  // Check for incoming chat messages
-  useEffect(() => {
-    if (!notifications || !Array.isArray(notifications) || !user) return;
-
-    // Find the latest unread chat notification
-    const unreadChat = notifications.find(
-      (n: any) =>
-        !n.is_read &&
-        (n.title.includes("رسالة") || n.link?.includes("chat=")) &&
-        !seenNotificationIdsRef.current.has(n.id)
-    );
-
-    if (unreadChat) {
-      seenNotificationIdsRef.current.add(unreadChat.id);
-
-      // Extract orderId from link if present
-      let extractedOrderId = "";
-      if (unreadChat.link && unreadChat.link.includes("chat=")) {
-        extractedOrderId = unreadChat.link.split("chat=")[1].split("&")[0];
-      }
-
-      if (extractedOrderId) {
-        // Show banner and play sound
-        setActiveBanner({
-          id: unreadChat.id,
-          orderId: extractedOrderId,
-          title: unreadChat.title,
-          body: unreadChat.body,
-        });
-
-        playMessageChime();
-
-        // Auto dismiss after 5 seconds
-        if (timerRef.current) clearTimeout(timerRef.current);
-        timerRef.current = setTimeout(() => {
-          setActiveBanner(null);
-        }, 5000);
-      }
-    }
-  }, [notifications, user]);
 
   const markAsReadMutation = useMutation({
     mutationFn: (notifId: string) => markRead({ data: { id: notifId } }),
@@ -168,21 +131,103 @@ export function InAppChatNotifier() {
     },
   });
 
+  // Check for incoming chat messages & order update notifications
+  useEffect(() => {
+    if (!notifications || !Array.isArray(notifications) || !user) return;
+
+    // Find the latest unread chat or order status notification
+    const unread = notifications.find(
+      (n: any) =>
+        !n.is_read &&
+        (n.title.includes("رسالة") || n.link?.includes("chat=") || n.title.includes("طلبك") || n.title.includes("طلب")) &&
+        !seenNotificationIdsRef.current.has(n.id)
+    );
+
+    if (unread) {
+      seenNotificationIdsRef.current.add(unread.id);
+
+      // Extract orderId from link if present
+      let extractedOrderId = "";
+      if (unread.link && unread.link.includes("chat=")) {
+        extractedOrderId = unread.link.split("chat=")[1].split("&")[0];
+      }
+
+      // Requirement: When chat dialog is currently open for that order,
+      // suffice with displaying the message in the chat feed and DO NOT show the top banner!
+      const activeWindowChatId = typeof window !== "undefined" ? (window as any).__HUSAYNIYA_ACTIVE_CHAT_ORDER_ID : null;
+      if (
+        (activeWindowChatId && activeWindowChatId === extractedOrderId) ||
+        (openChatOrderId && openChatOrderId === extractedOrderId)
+      ) {
+        // Silently mark as read without top banner interruption
+        markAsReadMutation.mutate(unread.id);
+        return;
+      }
+
+      if (extractedOrderId) {
+        // Show banner and play sound
+        setActiveBanner({
+          id: unread.id,
+          orderId: extractedOrderId,
+          title: unread.title,
+          body: unread.body,
+        });
+
+        playMessageChime();
+
+        // Auto dismiss after 6 seconds
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => {
+          setActiveBanner(null);
+        }, 6000);
+      }
+    }
+  }, [notifications, user, openChatOrderId]);
+
   function handleBannerClick() {
     if (!activeBanner) return;
     const targetOrderId = activeBanner.orderId;
     const notifId = activeBanner.id;
     setActiveBanner(null);
+    setTouchDeltaY(0);
     markAsReadMutation.mutate(notifId);
     setOpenChatOrderId(targetOrderId);
   }
 
-  function handleDismiss(e: React.MouseEvent) {
-    e.stopPropagation();
+  function handleDismiss(e?: React.MouseEvent) {
+    if (e) e.stopPropagation();
     if (activeBanner) {
       markAsReadMutation.mutate(activeBanner.id);
     }
     setActiveBanner(null);
+    setTouchDeltaY(0);
+  }
+
+  // Swipe gesture handlers
+  function handleTouchStart(e: React.TouchEvent) {
+    touchStartY.current = e.touches[0].clientY;
+  }
+
+  function handleTouchMove(e: React.TouchEvent) {
+    if (touchStartY.current === null) return;
+    const delta = e.touches[0].clientY - touchStartY.current;
+    // Bound drag for responsive feel
+    if (delta > -90 && delta < 90) {
+      setTouchDeltaY(delta);
+    }
+  }
+
+  function handleTouchEnd() {
+    if (touchStartY.current === null) return;
+    if (touchDeltaY > 25) {
+      // Swiped DOWN -> Open Chat!
+      handleBannerClick();
+    } else if (touchDeltaY < -20) {
+      // Swiped UP -> Dismiss Banner!
+      handleDismiss();
+    }
+    touchStartY.current = null;
+    setTouchDeltaY(0);
   }
 
   return (
@@ -228,17 +273,24 @@ export function InAppChatNotifier() {
         </div>
       )}
 
-      {/* Top Banner Alert */}
+      {/* Top Banner Alert with Swipe Gestures: Swipe down to open, swipe up to dismiss */}
       {activeBanner && (
         <div
           role="alert"
           onClick={handleBannerClick}
-          className="fixed top-3 left-1/2 -translate-x-1/2 z-[9999] w-[94%] max-w-md cursor-pointer transition-all duration-300 animate-in fade-in slide-in-from-top-4"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          style={{
+            transform: `translate(-50%, ${touchDeltaY}px)`,
+            transition: touchStartY.current !== null ? "none" : "transform 0.25s ease-out",
+          }}
+          className="fixed top-3 left-1/2 z-[9999] w-[94%] max-w-md cursor-pointer select-none transition-all duration-200 animate-in fade-in slide-in-from-top-4"
         >
           <div className="relative overflow-hidden rounded-2xl border-2 border-primary/40 bg-card/95 backdrop-blur-md p-3.5 shadow-2xl hover:border-primary transition-colors">
-            {/* 5-second countdown progress bar */}
+            {/* 6-second countdown progress bar */}
             <div className="absolute top-0 left-0 right-0 h-1 bg-primary/20">
-              <div className="h-full bg-primary animate-[shrink_5s_linear_forwards]" />
+              <div className="h-full bg-primary animate-[shrink_6s_linear_forwards]" />
             </div>
 
             <div className="flex items-start justify-between gap-3 pt-1">
@@ -263,8 +315,8 @@ export function InAppChatNotifier() {
                   <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
                     {activeBanner.body}
                   </p>
-                  <p className="text-[11px] font-semibold text-primary pt-0.5">
-                    اضغط هنا لفتح المحادثة والرد مباشرة 💬
+                  <p className="text-[11px] font-semibold text-primary pt-0.5 flex items-center gap-1">
+                    <span>اسحب لأسفل لفتح المحادثة ⬇️ • اسحب لأعلى للإغلاق ⬆️</span>
                   </p>
                 </div>
               </div>
@@ -282,7 +334,7 @@ export function InAppChatNotifier() {
         </div>
       )}
 
-      {/* Global Order Chat Dialog when banner is clicked */}
+      {/* Global Order Chat Dialog when banner is clicked or swiped down */}
       <OrderChatDialog
         orderId={openChatOrderId}
         open={!!openChatOrderId}
