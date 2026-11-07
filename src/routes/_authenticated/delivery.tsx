@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { CheckCheck, MapPin, Phone, RefreshCw, Store, Truck, Wallet, PackageOpen, Navigation, Volume2, VolumeX, Radio, Power, PowerOff, AlertCircle } from "lucide-react";
+import { CheckCheck, MapPin, Phone, RefreshCw, Store, Truck, Wallet, PackageOpen, Navigation, Volume2, VolumeX, Radio, Power, PowerOff, AlertCircle, MessageCircle } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,8 @@ import { claimOrder, completeOrder, getDriverBoard, setMyDriverWorkingStatus } f
 import { driverWallet } from "@/lib/delivery-rules";
 import { money, dateAr } from "@/lib/labels";
 import { pageMeta } from "@/lib/page-meta";
+import { cleanOrderNotes } from "@/lib/utils";
+import { OrderChatDialog } from "@/components/OrderChatDialog";
 
 export const Route = createFileRoute("/_authenticated/delivery")({
   validateSearch: (s: Record<string, unknown>) => ({ tab: ["available", "current", "wallet"].includes(String(s["tab"])) ? String(s["tab"]) : "available" }),
@@ -50,6 +52,7 @@ function Delivery() {
   const claim = useServerFn(claimOrder), complete = useServerFn(completeOrder);
   const setWorkingStatus = useServerFn(setMyDriverWorkingStatus);
   const [confirm, setConfirm] = useState<DeliveryOrder | null>(null);
+  const [chatOrderId, setChatOrderId] = useState<string | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const prevAvailableCount = useRef(data.available.length);
 
@@ -313,9 +316,9 @@ function Delivery() {
                     ))}
                   </div>
 
-                  {o.notes && (
+                  {cleanOrderNotes(o.notes) && (
                     <p className="mt-2 text-xs bg-amber-500/10 text-amber-900 dark:text-amber-200 p-2.5 rounded-lg border border-amber-500/20">
-                      <strong>ملاحظات العميل:</strong> {o.notes}
+                      <strong>ملاحظات العميل:</strong> {cleanOrderNotes(o.notes)}
                     </p>
                   )}
 
@@ -331,19 +334,30 @@ function Delivery() {
                     </div>
                   </div>
 
-                  {/* أزرار الاتصال والمراسلة */}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Button asChild variant="outline" size="sm" className="flex-1 font-semibold">
-                      <a href={`tel:${o.phone}`}>
-                        <Phone className="size-3.5 ml-1" />
-                        اتصال بالعميل
-                      </a>
+                  {/* أزرار الاتصال والمراسلة الفورية */}
+                  <div className="mt-3 space-y-2">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="w-full font-bold gap-2 bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
+                      onClick={() => setChatOrderId(o.id)}
+                    >
+                      <MessageCircle className="size-4" />
+                      محادثة فورية مع العميل
                     </Button>
-                    <Button asChild variant="outline" size="sm" className="flex-1 font-semibold text-emerald-600">
-                      <a href={`https://wa.me/20${o.phone.replace(/\D/g, "").replace(/^0/, "")}`} target="_blank" rel="noopener noreferrer">
-                        واتساب العميل
-                      </a>
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button asChild variant="outline" size="sm" className="flex-1 font-semibold">
+                        <a href={`tel:${o.phone}`}>
+                          <Phone className="size-3.5 ml-1" />
+                          اتصال بالعميل
+                        </a>
+                      </Button>
+                      <Button asChild variant="outline" size="sm" className="flex-1 font-semibold text-emerald-600">
+                        <a href={`https://wa.me/20${o.phone.replace(/\D/g, "").replace(/^0/, "")}`} target="_blank" rel="noopener noreferrer">
+                          واتساب العميل
+                        </a>
+                      </Button>
+                    </div>
                   </div>
 
                   {/* زر تأكيد التسليم */}
@@ -462,6 +476,12 @@ function Delivery() {
           </div>
         </DialogContent>
       </Dialog>
+      {/* محادثة كابتن التوصيل والعميل */}
+      <OrderChatDialog
+        orderId={chatOrderId}
+        open={!!chatOrderId}
+        onOpenChange={(open) => !open && setChatOrderId(null)}
+      />
     </div>
   );
 }

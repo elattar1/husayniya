@@ -28,6 +28,7 @@ import {
   CheckCircle2,
   Award,
   Calendar,
+  MessageCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,8 @@ import { dashboardQuery, dashboardProductsQuery, dashboardOrderItemsQuery, type 
 import { saveStore, saveProduct, deleteProduct, approveStore, updateRequest, transferStoreOwnership } from "@/lib/dashboard.functions";
 import { allowedNext, earnings, type LedgerRow, type RequestKind } from "@/lib/dashboard-rules";
 import { money, dateAr, STATUS_LABELS } from "@/lib/labels";
+import { cleanOrderNotes } from "@/lib/utils";
+import { OrderChatDialog } from "@/components/OrderChatDialog";
 
 type StoreRow = DashboardData["stores"][number];
 type ProductRow = DashboardProduct;
@@ -66,6 +69,7 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
   const [transferTarget, setTransferTarget] = useState<StoreRow | null>(null);
   const [targetEmail, setTargetEmail] = useState("");
   const [detail, setDetail] = useState<Task | null>(null);
+  const [chatOrderId, setChatOrderId] = useState<string | null>(null);
   const [remove, setRemove] = useState<ProductRow | null>(null);
   const [busy, setBusy] = useState(false);
   const [catalogOpen, setCatalogOpen] = useState(false);
@@ -1097,7 +1101,23 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
                   {currentDetail.phone}
                 </a>
               </p>
-              {currentDetail.notes && <p className="text-sm">ملاحظات: {currentDetail.notes}</p>}
+              {cleanOrderNotes(currentDetail.notes) && (
+                <p className="text-sm">ملاحظات: {cleanOrderNotes(currentDetail.notes)}</p>
+              )}
+              {currentDetail.kind === "orders" && (
+                <div className="pt-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 border-primary/30 text-primary hover:bg-primary/10 font-bold"
+                    onClick={() => setChatOrderId(currentDetail.id)}
+                  >
+                    <MessageCircle className="size-4" />
+                    محادثة الكابتن والعميل
+                  </Button>
+                </div>
+              )}
               {currentDetail.kind === "orders" && itemQuery.isPending && <p role="status" className="text-sm text-muted-foreground">جاري تحميل الأصناف...</p>}
               {currentDetail.kind === "orders" && itemQuery.isError && (
                 <div role="alert">
@@ -1164,6 +1184,12 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
           )}
         </DialogContent>
       </Dialog>
+      {/* نافذة المحادثة الفورية للطلب */}
+      <OrderChatDialog
+        orderId={chatOrderId}
+        open={!!chatOrderId}
+        onOpenChange={(open) => !open && setChatOrderId(null)}
+      />
     </div>
   );
 }
