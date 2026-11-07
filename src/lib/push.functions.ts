@@ -35,3 +35,84 @@ export const sendTestPush = createServerFn({ method: 'POST' })
     }
     return { accepted: true };
   });
+
+export async function sendPushToUser(
+  userId: string,
+  payload: { title: string; body: string; path?: string; tag?: string }
+): Promise<void> {
+  try {
+    const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+    const key = process.env['LOVABLE_API_KEY'];
+    const connectionKey = process.env['FIREBASE_MESSAGING_API_KEY'];
+    if (!key || !connectionKey) {
+      return;
+    }
+
+    const { data: devices, error } = await supabaseAdmin
+      .from('customer_push_devices')
+      .select('id, token')
+      .eq('user_id', userId);
+
+    if (error || !devices || devices.length === 0) {
+      return;
+    }
+
+    await Promise.allSettled(
+      devices.map(async (device) => {
+        try {
+          const res = await fetch(
+            'https://connector-gateway.lovable.dev/firebase_messaging/v1/projects/_/messages:send',
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${key}`,
+                'X-Connection-Api-Key': connectionKey,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                message: {
+                  token: device.token,
+                  notification: {
+                    title: payload.title,
+                    body: payload.body,
+                  },
+                  data: {
+                    path: payload.path || '/orders',
+                    title: payload.title,
+                    body: payload.body,
+                  },
+                  webpush: {
+                    notification: {
+                      icon: '/icon-192.png',
+                      badge: '/icon-192.png',
+                      tag: payload.tag || 'husayniya-chat',
+                      renotify: true,
+                    },
+                    fcm_options: {
+                      link: payload.path || '/orders',
+                    },
+                  },
+                },
+              }),
+            }
+          );
+
+          if (!res.ok) {
+            const bodyText = await res.text();
+            let code: string | undefined;
+            try {
+              code = JSON.parse(bodyText).error?.details?.find((d: { errorCode?: string }) => d.errorCode)?.errorCode;
+            } catch {}
+            if (isStalePushToken(res.status, code)) {
+              await supabaseAdmin.from('customer_push_devices').delete().eq('id', device.id);
+            }
+          }
+        } catch (e) {
+          console.error('Firebase push send error:', e);
+        }
+      })
+    );
+  } catch (err) {
+    console.error('sendPushToUser exception:', err);
+  }
+}

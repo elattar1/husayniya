@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from "react";
-import { MessageSquare, X, Store, Bike, User, Sparkles } from "lucide-react";
+import { MessageSquare, X, Store, Bike, BellRing, Check } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/lib/auth";
 import { getNotifications, readNotification } from "@/lib/customer.functions";
+import { registerPushDevice } from "@/lib/push.functions";
 import { OrderChatDialog } from "@/components/OrderChatDialog";
+import { Button } from "@/components/ui/button";
 
 function playMessageChime() {
   try {
@@ -41,6 +43,7 @@ export function InAppChatNotifier() {
   const { user } = useAuth();
   const getNotifs = useServerFn(getNotifications);
   const markRead = useServerFn(readNotification);
+  const registerDevice = useServerFn(registerPushDevice);
   const qc = useQueryClient();
 
   const [activeBanner, setActiveBanner] = useState<{
@@ -51,8 +54,62 @@ export function InAppChatNotifier() {
   } | null>(null);
 
   const [openChatOrderId, setOpenChatOrderId] = useState<string | null>(null);
+  const [showPushPrompt, setShowPushPrompt] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
   const seenNotificationIdsRef = useRef<Set<string>>(new Set());
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Auto-register push if permission is granted, or prompt if default
+  useEffect(() => {
+    if (!user || typeof window === "undefined") return;
+
+    async function checkPushPermission() {
+      if (!("Notification" in window) || !("serviceWorker" in navigator)) return;
+
+      if (Notification.permission === "granted") {
+        try {
+          const { enablePush } = await import("@/lib/push-browser");
+          const res = await enablePush();
+          if (res.status === "registered" && res.token) {
+            await registerDevice({ data: { token: res.token } });
+          }
+        } catch {}
+      } else if (Notification.permission === "default") {
+        const dismissed = localStorage.getItem("husayniya_push_dismissed");
+        if (!dismissed) {
+          setShowPushPrompt(true);
+        }
+      }
+    }
+
+    const t = setTimeout(checkPushPermission, 3000);
+    return () => clearTimeout(t);
+  }, [user]);
+
+  async function handleEnablePush() {
+    setPushBusy(true);
+    try {
+      const { enablePush } = await import("@/lib/push-browser");
+      const res = await enablePush();
+      if (res.status === "registered" && res.token) {
+        await registerDevice({ data: { token: res.token } });
+        setShowPushPrompt(false);
+      } else if (res.status === "denied") {
+        setShowPushPrompt(false);
+      }
+    } catch {
+      setShowPushPrompt(false);
+    } finally {
+      setPushBusy(false);
+    }
+  }
+
+  function handleDismissPushPrompt() {
+    setShowPushPrompt(false);
+    try {
+      localStorage.setItem("husayniya_push_dismissed", "true");
+    } catch {}
+  }
 
   // Poll for notifications every 4 seconds when user is signed in
   const { data: notifications } = useQuery({
@@ -130,6 +187,47 @@ export function InAppChatNotifier() {
 
   return (
     <>
+      {/* Push Notification Enable Banner */}
+      {showPushPrompt && !activeBanner && (
+        <div
+          role="alert"
+          className="fixed top-3 left-1/2 -translate-x-1/2 z-[9998] w-[94%] max-w-md animate-in fade-in slide-in-from-top-4"
+        >
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-primary/30 bg-card/95 p-3 shadow-xl backdrop-blur-md">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                <BellRing className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-bold text-xs">تفعيل إشعارات الهاتف</p>
+                <p className="text-[11px] text-muted-foreground truncate">
+                  لتلقي رسائل الطلبات وتنبيهات الكابتن حتى لو أغلقت الموقع
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <Button
+                size="sm"
+                disabled={pushBusy}
+                onClick={handleEnablePush}
+                className="h-8 gap-1 px-2.5 text-xs font-bold"
+              >
+                <Check className="size-3.5" />
+                تفعيل
+              </Button>
+              <button
+                type="button"
+                onClick={handleDismissPushPrompt}
+                className="rounded-lg p-1 text-muted-foreground hover:text-foreground"
+                title="لاحقاً"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Banner Alert */}
       {activeBanner && (
         <div

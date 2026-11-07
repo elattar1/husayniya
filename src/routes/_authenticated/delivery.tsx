@@ -5,6 +5,7 @@ import { CheckCheck, MapPin, Phone, RefreshCw, Store, Truck, Wallet, PackageOpen
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { PageTitle, StatusBadge } from "@/components/AppShell";
@@ -111,8 +112,6 @@ function Delivery() {
     );
   }
 
-  const list = tab === "current" ? current : data.available;
-
   return (
     <div className="mx-auto max-w-5xl px-4 py-7">
       {/* رأس شاشة السائق: زر واضح لمعرفة وتبديل حالة العمل (شغال / غير شغال) */}
@@ -193,9 +192,9 @@ function Delivery() {
         </div>
       )}
 
-      {/* تبويبات الشاشات المنفصلة */}
+      {/* تبويبات الشاشات على شاشات سطح المكتب فقط - مخفية تماماً على الموبايل لمنع التكرار */}
       <Tabs dir="rtl" value={tab} onValueChange={value => navigate({ search: { tab: value } })}>
-        <TabsList className="mb-6 grid h-auto w-full grid-cols-3">
+        <TabsList className="mb-6 hidden lg:grid h-auto w-full grid-cols-3">
           <TabsTrigger value="current" className="gap-1 px-1 py-2 font-bold">
             <Truck className="size-4" />
             معي الآن ({current.length})
@@ -211,12 +210,22 @@ function Delivery() {
         </TabsList>
       </Tabs>
 
-      {/* الجزء 1: المحفظة والأرباح فقط */}
+      {/* الشاشة 1: المحفظة والأرباح كصفحة مخصصة */}
       {tab === "wallet" && (
         <section className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold">محفظة الكابتن وسجل التحصيلات</h2>
-            <span className="text-xs text-muted-foreground">تحديث لحظي لجميع توصيلاتك</span>
+          <div className="rounded-2xl border bg-card p-4 sm:p-5 shadow-soft">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="grid size-10 place-items-center rounded-xl bg-amber-500/15 text-amber-600">
+                  <Wallet className="size-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold">محفظة الكابتن وسجل التحصيلات</h2>
+                  <p className="text-xs text-muted-foreground">رصيد أرباح التوصيل، المبالغ النقدية المحصلة، وحسابات التسليم</p>
+                </div>
+              </div>
+              <span className="text-xs font-semibold text-muted-foreground">تحديث لحظي لجميع توصيلاتك</span>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -247,12 +256,22 @@ function Delivery() {
         </section>
       )}
 
-      {/* الجزء 2: الطلب الحالي قيد التوصيل فقط */}
+      {/* الشاشة 2: الطلب الحالي قيد التوصيل كصفحة مخصصة */}
       {tab === "current" && (
         <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold">الطلب قيد التوصيل معك الآن ({current.length})</h2>
-            <span className="text-xs text-muted-foreground">قم بتأكيد التسليم بعد تحصيل المبلغ من العميل</span>
+          <div className="rounded-2xl border bg-card p-4 sm:p-5 shadow-soft">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary">
+                  <Truck className="size-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold">الطلبات الجارية (معي الآن)</h2>
+                  <p className="text-xs text-muted-foreground">الطلبات التي قمت بقبولها أو استلامها وتتولى توصيلها للعميل الآن</p>
+                </div>
+              </div>
+              <Badge variant="outline" className="font-bold text-xs">{current.length} قيد التنفيذ</Badge>
+            </div>
           </div>
 
           {current.length > 0 ? (
@@ -318,68 +337,54 @@ function Delivery() {
                           href={getGoogleMapsPinUrl(o.address)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          title="عرض النقطة على الخريطة"
+                          title="عرض موقع العميل فقط على الخريطة"
                         >
                           <MapPin className="size-3.5" />
-                          نقطة الخريطة
+                          الموقع
                         </a>
                       </Button>
                     </div>
                   </div>
 
-                  {/* محتويات الطلب */}
-                  <div className="my-3 space-y-1.5 border-t pt-3">
-                    <p className="text-xs font-semibold text-muted-foreground mb-1">محتويات الشحنة:</p>
-                    {o.order_items.map((item, i) => (
-                      <div key={`${item.name}-${i}`} className="flex justify-between text-xs">
-                        <span className="break-words font-medium">{item.name}</span>
-                        <span className="shrink-0 text-muted-foreground font-mono">× {item.qty}</span>
-                      </div>
-                    ))}
-                  </div>
-
+                  {/* ملاحظات الطلب للعميل */}
                   {cleanOrderNotes(o.notes) && (
-                    <p className="mt-2 text-xs bg-amber-500/10 text-amber-900 dark:text-amber-200 p-2.5 rounded-lg border border-amber-500/20">
-                      <strong>ملاحظات العميل:</strong> {cleanOrderNotes(o.notes)}
-                    </p>
+                    <div className="mb-3 rounded-xl bg-muted/60 p-3 text-xs leading-relaxed text-muted-foreground">
+                      <strong className="block text-foreground mb-0.5">ملاحظات العميل:</strong>
+                      {cleanOrderNotes(o.notes)}
+                    </div>
                   )}
 
-                  {/* المبالغ */}
+                  {/* التحصيل والأرباح */}
                   <div className="mt-4 flex flex-wrap justify-between gap-2 rounded-xl bg-muted/60 p-3 text-sm">
                     <div>
-                      <span className="text-xs text-muted-foreground block">المطلوب تحصيله من العميل</span>
+                      <span className="text-xs text-muted-foreground block">مطلوب تحصيله نقدًا</span>
                       <strong className="text-base font-bold text-destructive">{money(o.total)}</strong>
                     </div>
                     <div className="text-left sm:text-right">
-                      <span className="text-xs text-muted-foreground block">أجرك في هذا التوصيل</span>
+                      <span className="text-xs text-muted-foreground block">أجرك في التوصيل</span>
                       <strong className="text-base font-bold text-success">{money(o.delivery_fee)}</strong>
                     </div>
                   </div>
 
-                  {/* أزرار الاتصال والمراسلة الفورية */}
-                  <div className="mt-3 space-y-2">
-                    <Button
-                      variant="default"
-                      size="sm"
-                      className="w-full font-bold gap-2 bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
-                      onClick={() => setChatOrderId(o.id)}
-                    >
-                      <MessageCircle className="size-4" />
-                      محادثة فورية مع العميل
-                    </Button>
-                    <div className="flex flex-wrap gap-2">
-                      <Button asChild variant="outline" size="sm" className="flex-1 font-semibold">
+                  {/* أزرار الاتصال والدردشة الفورية مع العميل */}
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {o.phone && (
+                      <Button asChild variant="outline" className="flex-1 font-semibold gap-1.5 border-primary/30 h-10">
                         <a href={`tel:${o.phone}`}>
-                          <Phone className="size-3.5 ml-1" />
+                          <Phone className="size-4 text-primary" />
                           اتصال بالعميل
                         </a>
                       </Button>
-                      <Button asChild variant="outline" size="sm" className="flex-1 font-semibold text-emerald-600">
-                        <a href={`https://wa.me/20${o.phone.replace(/\D/g, "").replace(/^0/, "")}`} target="_blank" rel="noopener noreferrer">
-                          واتساب العميل
-                        </a>
-                      </Button>
-                    </div>
+                    )}
+                    <Button
+                      type="button"
+                      variant="default"
+                      onClick={() => setChatOrderId(o.id)}
+                      className="flex-1 font-bold gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground h-10 shadow-sm"
+                    >
+                      <MessageCircle className="size-4" />
+                      محادثة العميل
+                    </Button>
                   </div>
 
                   {/* زر تأكيد التسليم */}
@@ -400,12 +405,22 @@ function Delivery() {
         </section>
       )}
 
-      {/* الجزء 3: رادار الطلبات المتاحة فقط */}
+      {/* الشاشة 3: رادار الطلبات المتاحة كصفحة مخصصة */}
       {tab === "available" && (
         <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold">رادار الطلبات المتاحة للتوصيل ({data.available.length})</h2>
-            <span className="text-xs text-muted-foreground">طلبات جاهزة للاستلام من المتاجر</span>
+          <div className="rounded-2xl border bg-card p-4 sm:p-5 shadow-soft">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="grid size-10 place-items-center rounded-xl bg-emerald-500/15 text-emerald-600">
+                  <Radio className="size-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold">رادار الطلبات الجديدة المتاحة</h2>
+                  <p className="text-xs text-muted-foreground">طلبات جاهزة من المتاجر بانتظار قبول الكابتن للبدء في الاستلام والتوصيل</p>
+                </div>
+              </div>
+              <Badge variant="outline" className="font-bold text-xs">{data.available.length} متاح للاستلام</Badge>
+            </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">

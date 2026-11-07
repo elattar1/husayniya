@@ -1,7 +1,8 @@
 // Messaging only: no offline app-shell or navigation caching.
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  const url = new URL('/orders', self.location.origin).href;
+  const targetPath = event.notification.data?.path || event.notification.data?.link || '/orders';
+  const url = new URL(targetPath, self.location.origin).href;
   event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async windows => {
     for (const client of windows) {
       if (new URL(client.url).origin === self.location.origin) {

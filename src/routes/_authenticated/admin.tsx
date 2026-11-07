@@ -9,7 +9,10 @@ import { Button } from "@/components/ui/button";
 import { AdminComplaints } from "@/components/dashboard/AdminComplaints";
 
 export const Route = createFileRoute("/_authenticated/admin")({
-  validateSearch: (s: SearchSchemaInput & { q?: unknown; tab?: unknown }) => ({ q: typeof s.q === "string" ? s.q : "", tab: ["stores", "orders", "earnings"].includes(String(s.tab)) ? String(s.tab) : "stores" }),
+  validateSearch: (s: SearchSchemaInput & { q?: unknown; tab?: unknown }) => ({
+    q: typeof s.q === "string" ? s.q : "",
+    tab: ["stores", "products", "orders", "earnings"].includes(String(s.tab)) ? String(s.tab) : "stores",
+  }),
   loader: ({ context }) => context.queryClient.ensureQueryData({ ...dashboardQuery(true), revalidateIfStale: true }),
   head: () => pageMeta("لوحة الإدارة", "اعتماد المتاجر وضبط العمولات ومراجعة الطلبات والأرباح في خدمات الحسينية"),
   component: Admin,
@@ -48,5 +51,13 @@ function Admin() {
 
 function AdminAccess({ message }: { message: string }) {
   const router = useRouter();
-  return <div role="alert" className="mx-auto max-w-xl space-y-5 px-4 py-16 text-center"><ShieldCheck className="mx-auto size-12 text-primary" /><h1 className="text-2xl">دخول الإدارة</h1><p className="text-sm text-muted-foreground">{message}</p><p className="text-sm">هذه الصفحة متاحة لمديري التطبيق فقط.</p><Button variant="outline" onClick={() => router.invalidate()}>إعادة المحاولة</Button></div>;
+  return (
+    <div role="alert" className="mx-auto max-w-xl space-y-5 px-4 py-16 text-center">
+      <ShieldCheck className="mx-auto size-12 text-primary" />
+      <h1 className="text-2xl">دخول الإدارة</h1>
+      <p className="text-sm text-muted-foreground">{message}</p>
+      <p className="text-sm">هذه الصفحة متاحة لمديري التطبيق فقط.</p>
+      <Button variant="outline" onClick={() => router.invalidate()}>إعادة المحاولة</Button>
+    </div>
+  );
 }

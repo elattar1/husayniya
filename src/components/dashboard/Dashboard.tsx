@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -263,7 +264,7 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
 
       <Tabs dir="rtl" value={tab} onValueChange={onTab}>
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b pb-4">
-          <TabsList className="h-auto max-w-full flex-wrap bg-transparent p-0">
+          <TabsList className="hidden lg:flex h-auto max-w-full flex-wrap bg-transparent p-0">
             <TabsTrigger value="stores">
               {admin ? <ShieldCheck className="ml-2 size-4" /> : <Store className="ml-2 size-4" />}
               {admin ? "المتاجر والخدمات" : "المتجر"}
@@ -288,6 +289,25 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
         </div>
 
         <TabsContent value="stores">
+          <div className="mb-6 rounded-2xl border bg-card p-4 sm:p-5 shadow-soft">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className={`grid size-10 place-items-center rounded-xl ${admin ? "bg-purple-500/15 text-purple-600" : "bg-primary/10 text-primary"}`}>
+                  {admin ? <ShieldCheck className="size-5" /> : <Store className="size-5" />}
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold">{admin ? "لوحة المتاجر والأنشطة التجارية" : "بيانات وإعدادات المتجر"}</h2>
+                  <p className="text-xs text-muted-foreground">{admin ? "اعتماد المتاجر، نسب العمولة، وتعيين المديرين وحالات العمل" : "اسم المتجر، رقم التواصل، ساعات العمل، وتحديث الغلاف"}</p>
+                </div>
+              </div>
+              {admin && (
+                <Button onClick={() => setStoreEdit("new")} className="gap-1.5 font-bold">
+                  <Plus className="size-4" /> إضافة خدمة / متجر
+                </Button>
+              )}
+            </div>
+          </div>
+
           {admin ? (
             <>
               {/* قسم المطاعم والخدمات الأكثر طلباً */}
@@ -589,6 +609,19 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
         </TabsContent>
 
         <TabsContent value="products">
+          <div className="mb-6 rounded-2xl border bg-card p-4 sm:p-5 shadow-soft">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="grid size-10 place-items-center rounded-xl bg-blue-500/15 text-blue-600">
+                  <Package className="size-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold">{admin ? "إدارة المنيو وقوائم المنتجات" : "قائمة الطعام والمنتجات (المنيو)"}</h2>
+                  <p className="text-xs text-muted-foreground">تنظيم الأقسام، تعديل الأسعار والصور، وتحديد الأصناف المتوفرة</p>
+                </div>
+              </div>
+            </div>
+          </div>
           {/* محدد المتجر للمدير العام حتى يتمكن من إدارة منيو أي متجر في المنظومة */}
           {admin && (
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4 shadow-soft">
@@ -688,6 +721,20 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
         </TabsContent>
 
         <TabsContent value="orders">
+          <div className="mb-6 rounded-2xl border bg-card p-4 sm:p-5 shadow-soft">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="grid size-10 place-items-center rounded-xl bg-emerald-500/15 text-emerald-600">
+                  <ClipboardList className="size-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold">{admin ? "كافة طلبات وحجوزات المنظومة" : "الطلبات الواردة للمتجر"}</h2>
+                  <p className="text-xs text-muted-foreground">متابعة تنفيذ الطلبات وتحديث حالاتها والتواصل الفوري مع العميل</p>
+                </div>
+              </div>
+              <Badge variant="outline" className="font-bold text-xs">{visibleTasks.length} طلب مسجل</Badge>
+            </div>
+          </div>
           <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
             <div>
               <h2 className="text-lg font-bold">{admin ? "جميع طلبات وحجوزات المنظومة" : `طلبات وحجوزات متجر ${store?.name ?? ""}`} ({visibleTasks.length})</h2>
@@ -745,6 +792,19 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
         </TabsContent>
 
         <TabsContent value="earnings">
+          <div className="mb-6 rounded-2xl border bg-card p-4 sm:p-5 shadow-soft">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="grid size-10 place-items-center rounded-xl bg-amber-500/15 text-amber-600">
+                  <Wallet className="size-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold">{admin ? "التقارير المالية والخزينة العامة للمنصة" : `التقرير المالي لمتجر «${store?.name ?? ""}»`}</h2>
+                  <p className="text-xs text-muted-foreground">ملخص الإيرادات والمبيعات المكتملة وحسابات الأرباح الصافية</p>
+                </div>
+              </div>
+            </div>
+          </div>
           <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
             <div>
               <h2 className="text-lg font-bold">

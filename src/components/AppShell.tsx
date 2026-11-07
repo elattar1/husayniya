@@ -14,7 +14,6 @@ import {
   PackageOpen,
   Wallet,
   ArrowRightLeft,
-  Sparkles,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -44,7 +43,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { data: unread = 0 } = useUnread();
   const navigate = useNavigate();
 
-  const navItem = "flex flex-col items-center justify-center gap-0.5 text-[11px] text-muted-foreground px-2 py-1 transition-colors min-w-[54px]";
+  const navItem = "flex flex-col items-center justify-center gap-0.5 text-[11px] text-muted-foreground px-1.5 py-1 transition-colors min-w-[50px]";
   const active = { className: "text-primary font-bold" };
 
   const handleReturnToCustomer = () => {
@@ -106,6 +105,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             {appMode === "admin" && (
               <>
                 <Link to="/admin" search={{ tab: "stores" }} activeProps={active}>المتاجر والخدمات</Link>
+                <Link to="/admin" search={{ tab: "products" }} activeProps={active}>إدارة المنيو</Link>
                 <Link to="/admin" search={{ tab: "orders" }} activeProps={active}>الطلبات</Link>
                 <Link to="/drivers" search={{ q: "" }} activeProps={active}>فريق الدليفري</Link>
                 <Link to="/admin" search={{ tab: "earnings" }} activeProps={active}>الأرباح والخزينة</Link>
@@ -217,6 +217,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           <>
             <Link to="/admin" search={{ tab: "stores" }} className={navItem} activeProps={active}>
               <Store className="h-5 w-5" />المتاجر
+            </Link>
+            <Link to="/admin" search={{ tab: "products" }} className={navItem} activeProps={active}>
+              <Package className="h-5 w-5" />المنيو
             </Link>
             <Link to="/admin" search={{ tab: "orders" }} className={navItem} activeProps={active}>
               <ClipboardList className="h-5 w-5" />الطلبات

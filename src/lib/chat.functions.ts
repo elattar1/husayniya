@@ -288,22 +288,42 @@ export const sendOrderChatMessage = createServerFn({ method: "POST" })
       await supabaseAdmin.from("orders").update({ notes: serialized }).eq("id", data.orderId);
     }
 
-    // Intelligent notification routing based on chat stage
+    // Intelligent notification routing based on chat stage (both in-app and web push)
     try {
+      const { sendPushToUser } = await import("@/lib/push.functions");
+
       if (senderRole === "customer") {
         if (chatStage === "store" && storeRow?.owner_id) {
+          const title = `💬 رسالة من العميل (${storeRow.name})`;
+          const body = data.message.length > 70 ? data.message.slice(0, 67) + "..." : data.message;
+          const link = `/provider?tab=orders&chat=${data.orderId}`;
           await supabaseAdmin.from("notifications").insert({
             user_id: storeRow.owner_id,
-            title: `💬 رسالة من العميل (${storeRow.name})`,
-            body: data.message.length > 70 ? data.message.slice(0, 67) + "..." : data.message,
-            link: `/provider?tab=orders&chat=${data.orderId}`,
+            title,
+            body,
+            link,
+          });
+          await sendPushToUser(storeRow.owner_id, {
+            title,
+            body,
+            path: link,
+            tag: `husayniya-chat-${data.orderId}`,
           });
         } else if (chatStage === "driver" && order.driver_id) {
+          const title = "💬 رسالة جديدة من العميل";
+          const body = data.message.length > 70 ? data.message.slice(0, 67) + "..." : data.message;
+          const link = `/delivery?tab=current&chat=${data.orderId}`;
           await supabaseAdmin.from("notifications").insert({
             user_id: order.driver_id,
-            title: "💬 رسالة جديدة من العميل",
-            body: data.message.length > 70 ? data.message.slice(0, 67) + "..." : data.message,
-            link: `/delivery?tab=current&chat=${data.orderId}`,
+            title,
+            body,
+            link,
+          });
+          await sendPushToUser(order.driver_id, {
+            title,
+            body,
+            path: link,
+            tag: `husayniya-chat-${data.orderId}`,
           });
         }
       } else if (senderRole === "store" || senderRole === "driver" || senderRole === "admin") {
@@ -313,16 +333,24 @@ export const sendOrderChatMessage = createServerFn({ method: "POST" })
             : senderRole === "driver"
             ? "🛵 رسالة من كابتن التوصيل"
             : "رسالة من إدارة المنصة";
+        const body = data.message.length > 70 ? data.message.slice(0, 67) + "..." : data.message;
+        const link = `/orders?filter=active&chat=${data.orderId}`;
 
         await supabaseAdmin.from("notifications").insert({
           user_id: order.customer_id,
           title,
-          body: data.message.length > 70 ? data.message.slice(0, 67) + "..." : data.message,
-          link: `/orders?filter=active&chat=${data.orderId}`,
+          body,
+          link,
+        });
+        await sendPushToUser(order.customer_id, {
+          title,
+          body,
+          path: link,
+          tag: `husayniya-chat-${data.orderId}`,
         });
       }
     } catch (err) {
-      console.error("Failed to send notification:", err);
+      console.error("Failed to send notification / push:", err);
     }
 
     return { ok: true, message: newMessage };
