@@ -236,23 +236,31 @@ export const saveSection = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(sectionInput)
   .handler(async ({ context, data }) => {
-    const store = await context.supabase
-      .from("stores")
-      .select("id")
-      .eq("id", data.store_id)
-      .eq("owner_id", context.userId)
-      .maybeSingle();
-    if (store.error || !store.data) throw new Error("لا تملك صلاحية تعديل أقسام هذا المتجر");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const roleCheck = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
+    const isAdmin = !!roleCheck.data;
+
+    if (!isAdmin) {
+      const store = await context.supabase
+        .from("stores")
+        .select("id")
+        .eq("id", data.store_id)
+        .eq("owner_id", context.userId)
+        .maybeSingle();
+      if (store.error || !store.data) throw new Error("لا تملك صلاحية تعديل أقسام هذا المتجر");
+    }
+
+    const dbClient = isAdmin ? supabaseAdmin : context.supabase;
     const { id, store_id, ...values } = data;
     const result = id
-      ? await context.supabase
+      ? await dbClient
           .from("store_sections")
           .update(values)
           .eq("id", id)
           .eq("store_id", store_id)
           .select("id")
           .single()
-      : await context.supabase
+      : await dbClient
           .from("store_sections")
           .insert({ ...values, store_id })
           .select("id")
@@ -268,16 +276,29 @@ export const addSuggestedSections = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(z.object({ store_id: z.string().uuid() }))
   .handler(async ({ context, data }) => {
-    const store = await context.supabase
-      .from("stores")
-      .select("id,category")
-      .eq("id", data.store_id)
-      .eq("owner_id", context.userId)
-      .maybeSingle();
-    if (store.error || !store.data) throw new Error("لا تملك صلاحية تعديل أقسام هذا المتجر");
-    const suggestions = suggestedSectionsFor(store.data.category);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const roleCheck = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
+    const isAdmin = !!roleCheck.data;
+
+    let storeCategory = "";
+    if (isAdmin) {
+      const s = await supabaseAdmin.from("stores").select("category").eq("id", data.store_id).maybeSingle();
+      storeCategory = s.data?.category || "";
+    } else {
+      const store = await context.supabase
+        .from("stores")
+        .select("id,category")
+        .eq("id", data.store_id)
+        .eq("owner_id", context.userId)
+        .maybeSingle();
+      if (store.error || !store.data) throw new Error("لا تملك صلاحية تعديل أقسام هذا المتجر");
+      storeCategory = store.data.category;
+    }
+
+    const suggestions = suggestedSectionsFor(storeCategory);
     if (!suggestions.length) throw new Error("لا توجد أقسام مقترحة لهذا النوع من المتاجر");
-    const result = await context.supabase.from("store_sections").upsert(
+    const dbClient = isAdmin ? supabaseAdmin : context.supabase;
+    const result = await dbClient.from("store_sections").upsert(
       suggestions.map((name, index) => ({ store_id: data.store_id, name, sort_order: (index + 1) * 10 })),
       { onConflict: "store_id,name", ignoreDuplicates: true },
     );
@@ -289,23 +310,31 @@ export const saveProduct = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(productInput)
   .handler(async ({ context, data }) => {
-    const store = await context.supabase
-      .from("stores")
-      .select("id")
-      .eq("id", data.store_id)
-      .eq("owner_id", context.userId)
-      .single();
-    if (store.error || !store.data) throw new Error("لا تملك صلاحية تعديل منتجات هذا المتجر");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const roleCheck = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
+    const isAdmin = !!roleCheck.data;
+
+    if (!isAdmin) {
+      const store = await context.supabase
+        .from("stores")
+        .select("id")
+        .eq("id", data.store_id)
+        .eq("owner_id", context.userId)
+        .single();
+      if (store.error || !store.data) throw new Error("لا تملك صلاحية تعديل منتجات هذا المتجر");
+    }
+
+    const dbClient = isAdmin ? supabaseAdmin : context.supabase;
     const { id, ...values } = data;
     const result = id
-      ? await context.supabase
+      ? await dbClient
           .from("products")
           .update(values)
           .eq("id", id)
           .eq("store_id", data.store_id)
           .select("id")
           .single()
-      : await context.supabase.from("products").insert(values).select("id").single();
+      : await dbClient.from("products").insert(values).select("id").single();
     if (result.error) throw new Error(result.error.message);
     return result.data;
   });
@@ -314,14 +343,22 @@ export const deleteProduct = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(z.object({ id: z.string().uuid(), store_id: z.string().uuid() }))
   .handler(async ({ context, data }) => {
-    const store = await context.supabase
-      .from("stores")
-      .select("id")
-      .eq("id", data.store_id)
-      .eq("owner_id", context.userId)
-      .single();
-    if (store.error || !store.data) throw new Error("غير مسموح");
-    const result = await context.supabase
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const roleCheck = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
+    const isAdmin = !!roleCheck.data;
+
+    if (!isAdmin) {
+      const store = await context.supabase
+        .from("stores")
+        .select("id")
+        .eq("id", data.store_id)
+        .eq("owner_id", context.userId)
+        .single();
+      if (store.error || !store.data) throw new Error("غير مسموح");
+    }
+
+    const dbClient = isAdmin ? supabaseAdmin : context.supabase;
+    const result = await dbClient
       .from("products")
       .delete()
       .eq("id", data.id)
@@ -516,14 +553,28 @@ export const importCatalogProducts = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(catalogImportInput)
   .handler(async ({ context, data }) => {
-    const store = await context.supabase
-      .from("stores")
-      .select("id,category")
-      .eq("id", data.store_id)
-      .eq("owner_id", context.userId)
-      .single();
-    if (store.error || !store.data) throw new Error("لا تملك صلاحية تعديل منتجات هذا المتجر");
-    if (store.data.category !== "supermarkets") throw new Error("الكتالوج الجاهز متاح لمتاجر السوبر ماركت فقط");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const roleCheck = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
+    const isAdmin = !!roleCheck.data;
+
+    let storeCategory = "";
+    if (isAdmin) {
+      const s = await supabaseAdmin.from("stores").select("category").eq("id", data.store_id).maybeSingle();
+      storeCategory = s.data?.category || "";
+    } else {
+      const store = await context.supabase
+        .from("stores")
+        .select("id,category")
+        .eq("id", data.store_id)
+        .eq("owner_id", context.userId)
+        .single();
+      if (store.error || !store.data) throw new Error("لا تملك صلاحية تعديل منتجات هذا المتجر");
+      storeCategory = store.data.category;
+    }
+
+    if (storeCategory !== "supermarkets") throw new Error("الكتالوج الجاهز متاح لمتاجر السوبر ماركت فقط");
+
+    const dbClient = isAdmin ? supabaseAdmin : context.supabase;
 
     const items = data.items.map(input => {
       const item = catalogItem(input.key);
@@ -531,7 +582,7 @@ export const importCatalogProducts = createServerFn({ method: "POST" })
       return { input, item };
     });
     const usedGroups = CATALOG_GROUPS.filter(group => items.some(({ item }) => item.group === group.key));
-    const sectionSetup = await context.supabase.from("store_sections").upsert(
+    const sectionSetup = await dbClient.from("store_sections").upsert(
       usedGroups.map((group, index) => ({
         store_id: data.store_id,
         name: group.name,
@@ -540,7 +591,7 @@ export const importCatalogProducts = createServerFn({ method: "POST" })
       { onConflict: "store_id,name", ignoreDuplicates: true },
     );
     if (sectionSetup.error) throw new Error(sectionSetup.error.message);
-    const sections = await context.supabase
+    const sections = await dbClient
       .from("store_sections")
       .select("id,name")
       .eq("store_id", data.store_id);
@@ -560,7 +611,7 @@ export const importCatalogProducts = createServerFn({ method: "POST" })
         is_available: input.stock_qty !== 0,
       };
     });
-    const result = await context.supabase
+    const result = await dbClient
       .from("products")
       .upsert(rows, { onConflict: "store_id,catalog_key" })
       .select("id");

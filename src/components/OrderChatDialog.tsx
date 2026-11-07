@@ -14,7 +14,8 @@ import {
   AlertCircle,
   Sparkles,
   Shield,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Lock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -347,56 +348,71 @@ export function OrderChatDialog({ orderId, open, onOpenChange }: OrderChatDialog
           )}
         </div>
 
-        {/* Quick Suggestion Presets */}
-        <div className="border-t bg-card/60 px-3 py-2 shrink-0 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-          <Sparkles className="size-3.5 text-primary shrink-0 ml-1" />
-          {presets.map((preset, idx) => (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => handleSend(preset)}
-              disabled={sendMutation.isPending}
-              className="text-xs whitespace-nowrap bg-muted hover:bg-muted/80 text-foreground px-2.5 py-1 rounded-full transition-colors font-medium border border-border/50 shrink-0"
-            >
-              {preset}
-            </button>
-          ))}
-        </div>
+        {/* Quick Suggestion Presets & Input Bar, OR Locked Footer when delivered */}
+        {data?.status === "delivered" || data?.status === "completed" || data?.status === "cancelled" ? (
+          <div className="p-4 border-t bg-muted/40 shrink-0 text-center space-y-1">
+            <div className="flex items-center justify-center gap-2 text-xs font-bold text-foreground">
+              <Lock className="size-4 text-primary" />
+              <span>تم اكتمال تسليم الطلب بنجاح وأُغلقت المحادثة تلقائياً</span>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              سجل الرسائل محفوظ لديك للاطلاع عليه في أي وقت.
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Quick Suggestion Presets */}
+            <div className="border-t bg-card/60 px-3 py-2 shrink-0 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+              <Sparkles className="size-3.5 text-primary shrink-0 ml-1" />
+              {presets.map((preset, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => handleSend(preset)}
+                  disabled={sendMutation.isPending}
+                  className="text-xs whitespace-nowrap bg-muted hover:bg-muted/80 text-foreground px-2.5 py-1 rounded-full transition-colors font-medium border border-border/50 shrink-0"
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
 
-        {/* Input Bar */}
-        <div className="p-3 border-t bg-card shrink-0">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSend();
-            }}
-            className="flex items-center gap-2"
-          >
-            <Input
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              placeholder={
-                isCustomer
-                  ? isDriverStage
-                    ? "اكتب رسالة لكابتن التوصيل..."
-                    : `اكتب رسالة لـ ${data?.store?.name || "المتجر"}...`
-                  : "اكتب رسالتك للعميل..."
-              }
-              className="flex-1 bg-muted/30 h-10 text-sm focus-visible:ring-primary"
-              disabled={sendMutation.isPending}
-              autoFocus
-            />
-            <Button
-              type="submit"
-              size="icon"
-              disabled={!inputMessage.trim() || sendMutation.isPending}
-              className="size-10 shrink-0 bg-primary text-primary-foreground rounded-xl"
-              title="إرسال"
-            >
-              <Send className={`size-4 ${sendMutation.isPending ? "animate-pulse" : ""}`} />
-            </Button>
-          </form>
-        </div>
+            {/* Input Bar */}
+            <div className="p-3 border-t bg-card shrink-0">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSend();
+                }}
+                className="flex items-center gap-2"
+              >
+                <Input
+                  value={inputMessage}
+                  onChange={(e) => setInputMessage(e.target.value)}
+                  placeholder={
+                    isCustomer
+                      ? isDriverStage
+                        ? "اكتب رسالة لكابتن التوصيل..."
+                        : `اكتب رسالة لـ ${data?.store?.name || "المتجر"}...`
+                      : "اكتب رسالتك للعميل..."
+                  }
+                  className="flex-1 bg-muted/30 h-10 text-sm focus-visible:ring-primary"
+                  disabled={sendMutation.isPending}
+                  autoFocus
+                />
+                <Button
+                  type="submit"
+                  size="icon"
+                  disabled={!inputMessage.trim() || sendMutation.isPending}
+                  className="size-10 shrink-0 bg-primary text-primary-foreground rounded-xl"
+                  title="إرسال"
+                >
+                  <Send className={`size-4 ${sendMutation.isPending ? "animate-pulse" : ""}`} />
+                </Button>
+              </form>
+            </div>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );

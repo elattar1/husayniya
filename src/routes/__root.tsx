@@ -17,6 +17,7 @@ import { CartProvider } from "@/lib/cart";
 import { AppShell } from "@/components/AppShell";
 import { Toaster } from "@/components/ui/sonner";
 import { InstallAppBanner } from "@/components/InstallAppBanner";
+import { InAppChatNotifier } from "@/components/InAppChatNotifier";
 import { supabase } from "@/integrations/supabase/client";
 
 function NotFoundComponent() {
@@ -148,6 +149,7 @@ function RootComponent() {
           </AppShell>
           <Toaster position="top-center" richColors />
           <InstallAppBanner />
+          <InAppChatNotifier />
         </CartProvider>
       </AuthProvider>
     </QueryClientProvider>

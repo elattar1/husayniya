@@ -218,3 +218,60 @@ export const getDeliveryAvailability = createServerFn({ method: 'GET' })
       .eq('is_active', true);
     return { available: (count ?? 0) > 0, count: count ?? 0 };
   });
+
+export const submitOrderReview = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    z.object({
+      orderId: z.string().uuid(),
+      storeId: z.string().uuid(),
+      storeRating: z.number().min(1).max(5),
+      storeComment: z.string().trim().max(500).optional(),
+      driverRating: z.number().min(1).max(5).optional(),
+      driverComment: z.string().trim().max(500).optional(),
+    })
+  )
+  .handler(async ({ context, data }) => {
+    const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+
+    const orderRes = await supabaseAdmin
+      .from('orders')
+      .select('id, customer_id, driver_id, store_id, stores(name)')
+      .eq('id', data.orderId)
+      .eq('customer_id', context.userId)
+      .maybeSingle();
+
+    if (!orderRes.data) {
+      throw new Error('لم يتم العثور على الطلب');
+    }
+
+    const profile = await supabaseAdmin
+      .from('profiles')
+      .select('full_name')
+      .eq('id', context.userId)
+      .maybeSingle();
+    const authorName = profile.data?.full_name || 'عميل';
+
+    await supabaseAdmin.from('reviews').insert({
+      store_id: data.storeId,
+      user_id: context.userId,
+      author_name: authorName,
+      rating: data.storeRating,
+      comment: data.storeComment || 'تقييم جودة الخدمة والمنتجات',
+    });
+
+    if (data.driverRating && orderRes.data.driver_id) {
+      try {
+        await supabaseAdmin.from('notifications').insert({
+          user_id: orderRes.data.driver_id,
+          title: `⭐ تقييم جديد لخدمة التوصيل (${data.driverRating}/5)`,
+          body: data.driverComment || 'قيّم العميل خدمة التوصيل بنجاح. شكراً لجهودك!',
+          link: '/delivery?tab=wallet',
+        });
+      } catch (err) {
+        console.error('Driver review notification error:', err);
+      }
+    }
+
+    return { success: true };
+  });

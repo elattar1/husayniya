@@ -3,7 +3,7 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { useSuspenseQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { useState } from 'react';
-import { RefreshCw, Package, Check, X, MapPin, MessageCircle, Store, Bike } from 'lucide-react';
+import { RefreshCw, Package, Check, X, MapPin, MessageCircle, Store, Bike, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/AppShell';
@@ -18,6 +18,7 @@ import { cleanDisplayAddress } from '@/lib/map-utils';
 import { CustomerError, CustomerNotFound } from '@/components/CustomerFeedback';
 import { PushNotificationControls } from '@/components/PushNotificationControls';
 import { OrderChatDialog } from '@/components/OrderChatDialog';
+import { OrderReviewDialog } from '@/components/OrderReviewDialog';
 
 export const Route = createFileRoute('/_authenticated/orders')({
   validateSearch: (s: SearchSchemaInput & { filter?: unknown }) => ({
@@ -44,8 +45,22 @@ function Orders() {
   const cancel = useServerFn(cancelCustomerRequest);
   const [busy, setBusy] = useState('');
   const [chatOrderId, setChatOrderId] = useState<string | null>(null);
+  const [reviewOrder, setReviewOrder] = useState<any | null>(null);
   const { filter } = Route.useSearch();
   const navigate = Route.useNavigate();
+
+  // Auto-prompt rating dialog if there is a freshly delivered order not yet reviewed
+  useEffect(() => {
+    const delivered = data.orders.find((o) => o.status === 'delivered');
+    if (delivered) {
+      try {
+        const reviewed = localStorage.getItem(`order_reviewed_${delivered.id}`);
+        if (!reviewed) {
+          setReviewOrder(delivered);
+        }
+      } catch {}
+    }
+  }, [data.orders]);
 
   const rows = [
     ...data.orders.map((o) => ({
@@ -204,31 +219,55 @@ function Orders() {
                 </ol>
               )}
 
-              {/* أزرار الإجراءات السريعة (المحادثة الفورية وإلغاء الطلب) */}
+              {/* أزرار الإجراءات السريعة (المحادثة الفورية، التقييم، وإلغاء الطلب) */}
               <div className="mt-4 flex flex-wrap items-center gap-2">
-                {r.kind === 'orders' && r.status !== 'cancelled' && (
+                {r.kind === 'orders' && (r.status === 'delivered' || r.status === 'completed') && (
                   <Button
                     size="sm"
                     variant="outline"
-                    className={`gap-2 font-bold ${
-                      r.status === 'on_the_way' || r.status === 'delivered'
-                        ? 'border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10'
-                        : 'border-primary/40 text-primary hover:bg-primary/10'
-                    }`}
-                    onClick={() => setChatOrderId(r.id)}
+                    className="gap-2 border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 font-bold"
+                    onClick={() => setReviewOrder(r)}
                   >
-                    {r.status === 'on_the_way' || r.status === 'delivered' ? (
-                      <>
-                        <Bike className="size-4" />
-                        محادثة كابتن التوصيل 🛵
-                      </>
-                    ) : (
-                      <>
-                        <Store className="size-4" />
-                        محادثة المتجر / السوبرماركت 🏪
-                      </>
-                    )}
+                    <Star className="size-4 fill-amber-400 text-amber-400" />
+                    تقييم المتجر والتوصيل ⭐
                   </Button>
+                )}
+
+                {r.kind === 'orders' && r.status !== 'cancelled' && (
+                  r.status === 'delivered' || r.status === 'completed' ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                      onClick={() => setChatOrderId(r.id)}
+                    >
+                      <MessageCircle className="size-3.5" />
+                      سجل المحادثة (مغلقة)
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className={`gap-2 font-bold ${
+                        r.status === 'on_the_way'
+                          ? 'border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10'
+                          : 'border-primary/40 text-primary hover:bg-primary/10'
+                      }`}
+                      onClick={() => setChatOrderId(r.id)}
+                    >
+                      {r.status === 'on_the_way' ? (
+                        <>
+                          <Bike className="size-4" />
+                          محادثة كابتن التوصيل 🛵
+                        </>
+                      ) : (
+                        <>
+                          <Store className="size-4" />
+                          محادثة المتجر / السوبرماركت 🏪
+                        </>
+                      )}
+                    </Button>
+                  )
                 )}
 
                 {canCustomerCancel(r.kind, r.status) && (
@@ -287,6 +326,16 @@ function Orders() {
         orderId={chatOrderId}
         open={!!chatOrderId}
         onOpenChange={(open) => !open && setChatOrderId(null)}
+      />
+
+      {/* نافذة تقييم المتجر وكابتن التوصيل بعد اكتمال الطلب */}
+      <OrderReviewDialog
+        orderId={reviewOrder?.id ?? null}
+        storeId={reviewOrder?.store_id ?? null}
+        storeName={catalog.stores.find((s) => s.id === reviewOrder?.store_id)?.name ?? "المتجر"}
+        hasDriver={!!reviewOrder?.driver_id}
+        open={!!reviewOrder}
+        onOpenChange={(open) => !open && setReviewOrder(null)}
       />
     </div>
   );

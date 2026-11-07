@@ -222,6 +222,11 @@ export const sendOrderChatMessage = createServerFn({ method: "POST" })
       throw new Error("غير مصرح لك بإرسال رسائل في هذا الطلب");
     }
 
+    // Auto-close chat once order is delivered, completed, or cancelled
+    if (order.status === "delivered" || order.status === "completed" || order.status === "cancelled") {
+      throw new Error("تم إغلاق المحادثة تلقائياً لاكتمال تسليم الطلب");
+    }
+
     const isDriverStage = order.status === "on_the_way" || order.status === "delivered" || !!order.picked_up_at;
     const chatStage: "store" | "driver" = isDriverStage ? "driver" : "store";
 
@@ -291,14 +296,14 @@ export const sendOrderChatMessage = createServerFn({ method: "POST" })
             user_id: storeRow.owner_id,
             title: `💬 رسالة من العميل (${storeRow.name})`,
             body: data.message.length > 70 ? data.message.slice(0, 67) + "..." : data.message,
-            link: "/provider?tab=orders",
+            link: `/provider?tab=orders&chat=${data.orderId}`,
           });
         } else if (chatStage === "driver" && order.driver_id) {
           await supabaseAdmin.from("notifications").insert({
             user_id: order.driver_id,
             title: "💬 رسالة جديدة من العميل",
             body: data.message.length > 70 ? data.message.slice(0, 67) + "..." : data.message,
-            link: "/delivery?tab=current",
+            link: `/delivery?tab=current&chat=${data.orderId}`,
           });
         }
       } else if (senderRole === "store" || senderRole === "driver" || senderRole === "admin") {
@@ -313,7 +318,7 @@ export const sendOrderChatMessage = createServerFn({ method: "POST" })
           user_id: order.customer_id,
           title,
           body: data.message.length > 70 ? data.message.slice(0, 67) + "..." : data.message,
-          link: "/orders?filter=active",
+          link: `/orders?filter=active&chat=${data.orderId}`,
         });
       }
     } catch (err) {
