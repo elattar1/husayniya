@@ -5,13 +5,16 @@ import {
   Send, 
   Phone, 
   Bike, 
+  Store, 
   User, 
   RefreshCw, 
   MessageCircle, 
   Clock, 
   CheckCheck,
   AlertCircle,
-  Sparkles
+  Sparkles,
+  Shield,
+  ArrowRightLeft
 } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -42,18 +45,32 @@ function playReceiveSound() {
   } catch {}
 }
 
-const DRIVER_PRESETS = [
+const CUSTOMER_TO_STORE_PRESETS = [
+  "هل يمكن تعديل أو إضافة صنف؟ 🛒",
+  "كم من الوقت متبقي للتجهيز؟ ⏱️",
+  "رجاءً التأكد من تغليف الأصناف جيداً 👍",
+  "تمام، في انتظاركم 🙏",
+];
+
+const STORE_TO_CUSTOMER_PRESETS = [
+  "جاري تجهيز طلبك الآن بعناية 🛍️",
+  "يوجد صنف غير متوفر، تحب نستبدله بآخر؟ 🔄",
+  "طلبك جاهز وبانتظار وصول كابتن التوصيل 📦",
+  "تم التأكيد، سيكون الطلب جاهزاً خلال دقائق ⏱️",
+];
+
+const CUSTOMER_TO_DRIVER_PRESETS = [
+  "أنا في انتظارك أمام المنزل 👍",
+  "أنا نازل أستلم منك حالاً 🏢",
+  "اتصل بي أول ما توصل 📱",
+  "شكراً جزيلاً يا كابتن 🙏",
+];
+
+const DRIVER_TO_CUSTOMER_PRESETS = [
   "أنا في الطريق إليك الآن 🛵",
   "وصلت تحت المبنى/البيت 📍",
   "معي الطلب وجاهز للتسليم 📦",
   "برجاء الرد على الهاتف 📞",
-];
-
-const CUSTOMER_PRESETS = [
-  "تمام، أنا في انتظارك 👍",
-  "أنا نازل أستلم منك حالاً 🏢",
-  "العنوان بالتحديد: ",
-  "اتصل بي أول ما توصل 📱",
 ];
 
 export function OrderChatDialog({ orderId, open, onOpenChange }: OrderChatDialogProps) {
@@ -101,7 +118,6 @@ export function OrderChatDialog({ orderId, open, onOpenChange }: OrderChatDialog
     },
     onSuccess: (res) => {
       setInputMessage("");
-      // Optimistically push message into cache
       if (res.message) {
         qc.setQueryData<OrderChatInfo>(queryKey, (prev) => {
           if (!prev) return prev;
@@ -127,11 +143,44 @@ export function OrderChatDialog({ orderId, open, onOpenChange }: OrderChatDialog
   };
 
   const isCustomer = data?.myRole === "customer";
-  const otherPartyTitle = isCustomer
-    ? data?.driver?.name || "كابتن التوصيل"
-    : data?.customer?.name || "العميل";
-  const otherPartyPhone = isCustomer ? data?.driver?.phone : data?.customer?.phone;
-  const presets = isCustomer ? CUSTOMER_PRESETS : DRIVER_PRESETS;
+  const isStore = data?.myRole === "store";
+  const isDriver = data?.myRole === "driver";
+  const isDriverStage = data?.chatStage === "driver";
+
+  // Determine active other party details
+  let otherPartyTitle = "الطرف الآخر";
+  let otherPartyPhone: string | null = null;
+  let stageDescription = "";
+  let presets: string[] = [];
+
+  if (isCustomer) {
+    if (isDriverStage) {
+      otherPartyTitle = data?.driver?.name || "كابتن التوصيل";
+      otherPartyPhone = data?.driver?.phone || null;
+      stageDescription = "الطلب في الطريق إليك مع الكابتن 🛵";
+      presets = CUSTOMER_TO_DRIVER_PRESETS;
+    } else {
+      otherPartyTitle = data?.store?.name || "المتجر / المطعم";
+      otherPartyPhone = data?.store?.phone || null;
+      stageDescription = "جاري تجهيز وتأكيد طلبك داخل المتجر 🏪";
+      presets = CUSTOMER_TO_STORE_PRESETS;
+    }
+  } else if (isStore) {
+    otherPartyTitle = data?.customer?.name ? `العميل (${data.customer.name})` : "العميل";
+    otherPartyPhone = data?.customer?.phone || null;
+    stageDescription = "تواصل مباشر مع العميل أثناء تجهيز الطلب";
+    presets = STORE_TO_CUSTOMER_PRESETS;
+  } else if (isDriver) {
+    otherPartyTitle = data?.customer?.name ? `العميل (${data.customer.name})` : "العميل";
+    otherPartyPhone = data?.customer?.phone || null;
+    stageDescription = "توصيل الشحنة للعميل";
+    presets = DRIVER_TO_CUSTOMER_PRESETS;
+  } else {
+    // Admin
+    otherPartyTitle = isDriverStage ? (data?.driver?.name || "كابتن التوصيل") : (data?.store?.name || "المتجر");
+    stageDescription = "متابعة إدارة المنظومة";
+    presets = ["مرحباً، للمساعدة بخصوص الطلب...", "تم التحقق من تفاصيل الطلب"];
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -140,16 +189,21 @@ export function OrderChatDialog({ orderId, open, onOpenChange }: OrderChatDialog
         <DialogHeader className="p-4 border-b bg-card shrink-0 flex flex-row items-center justify-between text-right space-y-0">
           <div className="flex items-center gap-3">
             <div className="size-10 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
-              {isCustomer ? <Bike className="size-5" /> : <User className="size-5" />}
+              {isCustomer ? (
+                isDriverStage ? <Bike className="size-5" /> : <Store className="size-5" />
+              ) : (
+                <User className="size-5" />
+              )}
             </div>
             <div>
               <DialogTitle className="text-base font-bold flex items-center gap-2">
                 {otherPartyTitle}
                 <span className="inline-block size-2 rounded-full bg-emerald-500 animate-pulse" title="متصل الآن" />
               </DialogTitle>
-              <DialogDescription className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
+              <DialogDescription className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
                 <span>طلب #{orderId?.slice(0, 8)}</span>
-                {data?.storeName && <span>• {data.storeName}</span>}
+                <span>•</span>
+                <span className="text-primary font-medium">{stageDescription}</span>
               </DialogDescription>
             </div>
           </div>
@@ -199,14 +253,26 @@ export function OrderChatDialog({ orderId, open, onOpenChange }: OrderChatDialog
 
           {!isLoading && !isError && data && (
             <>
-              {/* Waiting for driver prompt */}
-              {isCustomer && !data.driver && (
-                <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2">
-                  <Clock className="size-4 shrink-0 text-amber-600 mt-0.5" />
+              {/* Context info banner */}
+              {isCustomer && !isDriverStage && (
+                <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs text-foreground flex items-start gap-2 shadow-xs">
+                  <Store className="size-4 shrink-0 text-primary mt-0.5" />
                   <div>
-                    <p className="font-semibold">جاري تحضير وتعيين كابتن للطلب</p>
-                    <p className="text-[11px] opacity-90 mt-0.5">
-                      يمكنك ترك رسالة هنا وسيراها الكابتن فور استلامه الشحنة.
+                    <p className="font-semibold text-primary">المحادثة الآن مباشرة مع {data.store?.name || "المتجر"}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                      يتم تجهيز طلبك داخل المتجر. يمكنك الاستفسار أو طلب أي تعديل وسيرد عليك المتجر فوراً. عند انتهاء التحضير واستلام الكابتن للطلب، ستنتقل المحادثة تلقائياً لكابتن التوصيل 🛵.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {isCustomer && isDriverStage && (
+                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-950 dark:text-emerald-200 flex items-start gap-2 shadow-xs">
+                  <Bike className="size-4 shrink-0 text-emerald-600 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-emerald-700 dark:text-emerald-300">الطلب الآن مع كابتن التوصيل ({data.driver?.name || "الكابتن"})</p>
+                    <p className="text-[11px] opacity-90 mt-0.5 leading-relaxed">
+                      انتهى المتجر من التحضير واستلم الكابتن الطلب وهو في الطريق لتسليمه لك. يمكنك مراسلته لتنسيق مكان الاستلام بدقة.
                     </p>
                   </div>
                 </div>
@@ -220,18 +286,28 @@ export function OrderChatDialog({ orderId, open, onOpenChange }: OrderChatDialog
                   </div>
                   <h4 className="font-bold text-foreground text-sm">محادثة فورية مباشرة</h4>
                   <p className="text-xs max-w-xs text-muted-foreground">
-                    تواصل مباشرة مع {otherPartyTitle} لتنسيق موعد ومكان الاستلام بدقة وسهولة.
+                    تواصل مباشرة مع {otherPartyTitle} لتنسيق ومتابعة تفاصيل الطلب لحظة بلحظة.
                   </p>
                 </div>
               )}
 
               {/* Messages Bubble Stream */}
-              {data.messages.map((msg) => {
+              {data.messages.map((msg, idx) => {
                 const isMe = msg.sender_role === data.myRole;
                 const formattedTime = new Date(msg.created_at).toLocaleTimeString("ar-EG", {
                   hour: "2-digit",
                   minute: "2-digit",
                 });
+
+                // Display role badge
+                const roleBadge = 
+                  msg.sender_role === "store"
+                    ? `🏪 ${msg.sender_name || (data.store?.name ?? "المتجر")}`
+                    : msg.sender_role === "driver"
+                    ? `🛵 ${msg.sender_name || "كابتن التوصيل"}`
+                    : msg.sender_role === "customer"
+                    ? `👤 ${msg.sender_name || "العميل"}`
+                    : `🛡️ ${msg.sender_name || "الإدارة"}`;
 
                 return (
                   <div
@@ -240,7 +316,7 @@ export function OrderChatDialog({ orderId, open, onOpenChange }: OrderChatDialog
                   >
                     <div className="flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground">
                       <span className="font-medium">
-                        {isMe ? "أنت" : msg.sender_name || (msg.sender_role === "driver" ? "كابتن التوصيل" : "العميل")}
+                        {isMe ? "أنت" : roleBadge}
                       </span>
                       <span>•</span>
                       <span>{formattedTime}</span>
@@ -299,7 +375,13 @@ export function OrderChatDialog({ orderId, open, onOpenChange }: OrderChatDialog
             <Input
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
-              placeholder={isCustomer ? "اكتب رسالة للكابتن..." : "اكتب رسالة للعميل..."}
+              placeholder={
+                isCustomer
+                  ? isDriverStage
+                    ? "اكتب رسالة لكابتن التوصيل..."
+                    : `اكتب رسالة لـ ${data?.store?.name || "المتجر"}...`
+                  : "اكتب رسالتك للعميل..."
+              }
               className="flex-1 bg-muted/30 h-10 text-sm focus-visible:ring-primary"
               disabled={sendMutation.isPending}
               autoFocus

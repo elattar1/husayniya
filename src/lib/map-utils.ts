@@ -24,13 +24,21 @@ export const HUSAYNIYA_LANDMARKS = [
 
 /**
  * Extracts latitude and longitude from text if present.
- * Looks for patterns like:
- * - (30.8656, 31.9192)
- * - [30.8656, 31.9192]
- * - 📍 30.8656, 31.9192
+ * Supports invisible comments <!-- GPS:lat,lng --> as well as (lat, lng) patterns.
  */
 export function extractCoordinates(text?: string | null): Coordinates | null {
   if (!text) return null;
+  // Pattern 1: HTML comment comment format <!-- GPS:30.8656,31.9192 -->
+  const gpsMatch = text.match(/<!--\s*GPS:\s*([0-9]{1,2}\.[0-9]{3,8})\s*,\s*([0-9]{1,2}\.[0-9]{3,8})\s*-->/i);
+  if (gpsMatch) {
+    const lat = parseFloat(gpsMatch[1]);
+    const lng = parseFloat(gpsMatch[2]);
+    if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+      return { lat, lng };
+    }
+  }
+
+  // Pattern 2: (lat, lng) or [lat, lng]
   const match = text.match(/(?:📍|\(|\[|q=)?\s*([0-9]{1,2}\.[0-9]{3,8})\s*,\s*([0-9]{1,2}\.[0-9]{3,8})/);
   if (match) {
     const lat = parseFloat(match[1]);
@@ -43,22 +51,24 @@ export function extractCoordinates(text?: string | null): Coordinates | null {
 }
 
 /**
- * Attaches map coordinates to an address string so it persists in existing database columns.
+ * Attaches map coordinates to an address string silently inside an HTML comment
+ * so it stays hidden from customer view while persisting in the database.
  */
 export function formatAddressWithCoordinates(baseAddress: string, coords: Coordinates): string {
   const clean = cleanDisplayAddress(baseAddress);
-  const formattedCoords = `(${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)})`;
-  return clean ? `${clean} ${formattedCoords}` : `الحسينية ${formattedCoords}`;
+  const formattedCoords = `<!-- GPS:${coords.lat.toFixed(6)},${coords.lng.toFixed(6)} -->`;
+  return clean ? `${clean} ${formattedCoords}` : formattedCoords;
 }
 
 /**
- * Removes raw coordinate suffixes for human-friendly text display.
+ * Removes hidden GPS comments and raw coordinate suffixes for human-friendly text display.
  */
 export function cleanDisplayAddress(address?: string | null): string {
   if (!address) return "";
   return address
+    .replace(/<!--\s*GPS:[\s\S]*?-->/gi, "")
+    .replace(/<!--\s*CHAT_V1:[\s\S]*?-->/gi, "")
     .replace(/\s*(?:📍|\(|\[)?\s*[0-9]{1,2}\.[0-9]{3,8}\s*,\s*[0-9]{1,2}\.[0-9]{3,8}(?:\)|\])?/g, "")
-    .replace(/<!-- CHAT_V1: [\s\S]*? -->/, "")
     .trim();
 }
 
@@ -72,9 +82,7 @@ export function getGoogleNavigationUrl(customerAddress: string, storeAddress?: s
     ? `${coords.lat},${coords.lng}`
     : encodeURIComponent(cleanDisplayAddress(customerAddress) + " الحسينية الشرقية");
 
-  // If store address is provided, set as origin if user wants
-  let url = `https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`;
-  return url;
+  return `https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`;
 }
 
 /**

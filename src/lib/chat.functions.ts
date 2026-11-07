@@ -6,7 +6,7 @@ export interface ChatMessage {
   id: string;
   order_id: string;
   sender_id: string;
-  sender_role: "customer" | "driver" | "admin";
+  sender_role: "customer" | "store" | "driver" | "admin";
   sender_name: string;
   message: string;
   created_at: string;
@@ -15,20 +15,27 @@ export interface ChatMessage {
 export interface OrderChatInfo {
   orderId: string;
   status: string;
-  storeName: string | null;
-  total: number;
-  deliveryFee: number;
-  customer: {
+  chatStage: "store" | "driver"; // "store" during preparation, "driver" once picked up
+  store: {
     id: string;
-    phone: string;
     name: string;
-  };
+    phone: string | null;
+    category: string | null;
+    ownerId: string | null;
+  } | null;
   driver: {
     id: string | null;
     phone: string | null;
     name: string | null;
   } | null;
-  myRole: "customer" | "driver" | "admin";
+  customer: {
+    id: string;
+    phone: string;
+    name: string;
+  };
+  total: number;
+  deliveryFee: number;
+  myRole: "customer" | "store" | "driver" | "admin";
   messages: ChatMessage[];
 }
 
@@ -58,7 +65,7 @@ export const getOrderChat = createServerFn({ method: "POST" })
 
     const orderRes = await supabaseAdmin
       .from("orders")
-      .select("id, customer_id, driver_id, status, phone, notes, total, delivery_fee, stores(name)")
+      .select("id, customer_id, driver_id, store_id, status, phone, notes, total, delivery_fee, picked_up_at, stores(id, name, owner_id, phone, category)")
       .eq("id", data.orderId)
       .maybeSingle();
 
@@ -67,18 +74,28 @@ export const getOrderChat = createServerFn({ method: "POST" })
     }
 
     const order = orderRes.data;
+    const storeRow = order.stores as any;
 
-    // Check authorization: must be customer, driver, or platform admin
+    // Check authorization: customer, assigned driver, store owner, or platform admin
     const isAdmin = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
     const isCustomer = context.userId === order.customer_id;
     const isDriver = context.userId === order.driver_id;
+    const isStoreOwner = storeRow && storeRow.owner_id === context.userId;
 
-    if (!isCustomer && !isDriver && !isAdmin.data) {
+    if (!isCustomer && !isDriver && !isStoreOwner && !isAdmin.data) {
       throw new Error("غير مصرح لك بالاطلاع على محادثة هذا الطلب");
     }
 
-    const myRole: "customer" | "driver" | "admin" = isDriver
+    // Determine current chat stage:
+    // If order is with driver (status: "on_the_way" or "delivered" or picked up) -> "driver"
+    // Otherwise (placed, confirmed, preparing) -> "store"
+    const isDriverStage = order.status === "on_the_way" || order.status === "delivered" || !!order.picked_up_at;
+    const chatStage: "store" | "driver" = isDriverStage ? "driver" : "store";
+
+    const myRole: "customer" | "store" | "driver" | "admin" = isDriver
       ? "driver"
+      : isStoreOwner
+      ? "store"
       : isCustomer
       ? "customer"
       : "admin";
@@ -131,7 +148,7 @@ export const getOrderChat = createServerFn({ method: "POST" })
           id: String(m.id),
           order_id: String(m.order_id),
           sender_id: String(m.sender_id),
-          sender_role: m.sender_role as "customer" | "driver" | "admin",
+          sender_role: m.sender_role as "customer" | "store" | "driver" | "admin",
           sender_name: String(m.sender_name),
           message: String(m.message),
           created_at: String(m.created_at),
@@ -148,15 +165,24 @@ export const getOrderChat = createServerFn({ method: "POST" })
     return {
       orderId: order.id,
       status: order.status,
-      storeName: (order.stores as any)?.name ?? null,
-      total: Number(order.total || 0),
-      deliveryFee: Number(order.delivery_fee || 0),
+      chatStage,
+      store: storeRow
+        ? {
+            id: storeRow.id,
+            name: storeRow.name,
+            phone: storeRow.phone ?? null,
+            category: storeRow.category ?? null,
+            ownerId: storeRow.owner_id ?? null,
+          }
+        : null,
+      driver: driverData,
       customer: {
         id: order.customer_id,
         phone: order.phone,
         name: customerName,
       },
-      driver: driverData,
+      total: Number(order.total || 0),
+      deliveryFee: Number(order.delivery_fee || 0),
       myRole,
       messages,
     };
@@ -175,7 +201,7 @@ export const sendOrderChatMessage = createServerFn({ method: "POST" })
 
     const orderRes = await supabaseAdmin
       .from("orders")
-      .select("id, customer_id, driver_id, status, notes")
+      .select("id, customer_id, driver_id, store_id, status, notes, picked_up_at, stores(id, name, owner_id, phone)")
       .eq("id", data.orderId)
       .maybeSingle();
 
@@ -184,30 +210,41 @@ export const sendOrderChatMessage = createServerFn({ method: "POST" })
     }
 
     const order = orderRes.data;
+    const storeRow = order.stores as any;
 
-    // Check authorization: customer, driver, or admin
+    // Check authorization
     const isAdmin = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
     const isCustomer = context.userId === order.customer_id;
     const isDriver = context.userId === order.driver_id;
+    const isStoreOwner = storeRow && storeRow.owner_id === context.userId;
 
-    if (!isCustomer && !isDriver && !isAdmin.data) {
+    if (!isCustomer && !isDriver && !isStoreOwner && !isAdmin.data) {
       throw new Error("غير مصرح لك بإرسال رسائل في هذا الطلب");
     }
 
-    const senderRole: "customer" | "driver" | "admin" = isDriver
+    const isDriverStage = order.status === "on_the_way" || order.status === "delivered" || !!order.picked_up_at;
+    const chatStage: "store" | "driver" = isDriverStage ? "driver" : "store";
+
+    const senderRole: "customer" | "store" | "driver" | "admin" = isDriver
       ? "driver"
+      : isStoreOwner
+      ? "store"
       : isCustomer
       ? "customer"
       : "admin";
 
     // Determine sender display name
-    let senderName = senderRole === "driver" ? "كابتن التوصيل" : senderRole === "customer" ? "العميل" : "إدارة خدمات الحسينية";
-    if (senderRole === "driver") {
+    let senderName = "مستخدم";
+    if (senderRole === "store") {
+      senderName = storeRow?.name ? `إدارة ${storeRow.name}` : "إدارة المتجر";
+    } else if (senderRole === "driver") {
       const dr = await supabaseAdmin.from("drivers").select("full_name").eq("user_id", context.userId).maybeSingle();
-      if (dr.data?.full_name) senderName = `الكابتن ${dr.data.full_name}`;
+      senderName = dr.data?.full_name ? `الكابتن ${dr.data.full_name}` : "كابتن التوصيل";
     } else if (senderRole === "customer") {
       const pr = await supabaseAdmin.from("profiles").select("full_name").eq("id", context.userId).maybeSingle();
-      if (pr.data?.full_name) senderName = pr.data.full_name;
+      senderName = pr.data?.full_name || "العميل";
+    } else {
+      senderName = "إدارة خدمات الحسينية";
     }
 
     const newMessage: ChatMessage = {
@@ -238,7 +275,7 @@ export const sendOrderChatMessage = createServerFn({ method: "POST" })
       savedInTable = false;
     }
 
-    // In all cases, also guarantee persistence in order notes if table didn't save
+    // Always guarantee persistence in order notes if table didn't save
     if (!savedInTable) {
       const { cleanNotes, messages } = parseMessagesFromNotes(order.notes);
       const updatedMessages = [...messages, newMessage];
@@ -246,19 +283,41 @@ export const sendOrderChatMessage = createServerFn({ method: "POST" })
       await supabaseAdmin.from("orders").update({ notes: serialized }).eq("id", data.orderId);
     }
 
-    // Send notification to the other party
-    const targetUserId = senderRole === "driver" ? order.customer_id : order.driver_id;
-    if (targetUserId && targetUserId !== context.userId) {
-      try {
+    // Intelligent notification routing based on chat stage
+    try {
+      if (senderRole === "customer") {
+        if (chatStage === "store" && storeRow?.owner_id) {
+          await supabaseAdmin.from("notifications").insert({
+            user_id: storeRow.owner_id,
+            title: `💬 رسالة من العميل (${storeRow.name})`,
+            body: data.message.length > 70 ? data.message.slice(0, 67) + "..." : data.message,
+            link: "/provider?tab=orders",
+          });
+        } else if (chatStage === "driver" && order.driver_id) {
+          await supabaseAdmin.from("notifications").insert({
+            user_id: order.driver_id,
+            title: "💬 رسالة جديدة من العميل",
+            body: data.message.length > 70 ? data.message.slice(0, 67) + "..." : data.message,
+            link: "/delivery?tab=current",
+          });
+        }
+      } else if (senderRole === "store" || senderRole === "driver" || senderRole === "admin") {
+        const title =
+          senderRole === "store"
+            ? `🏪 رسالة من ${storeRow?.name ?? "المتجر"}`
+            : senderRole === "driver"
+            ? "🛵 رسالة من كابتن التوصيل"
+            : "رسالة من إدارة المنصة";
+
         await supabaseAdmin.from("notifications").insert({
-          user_id: targetUserId,
-          title: senderRole === "driver" ? "🛵 رسالة جديدة من كابتن التوصيل" : "💬 رسالة جديدة من العميل",
+          user_id: order.customer_id,
+          title,
           body: data.message.length > 70 ? data.message.slice(0, 67) + "..." : data.message,
-          link: senderRole === "driver" ? "/orders?filter=active" : "/delivery?tab=current",
+          link: "/orders?filter=active",
         });
-      } catch (err) {
-        console.error("Failed to insert notification:", err);
       }
+    } catch (err) {
+      console.error("Failed to send notification:", err);
     }
 
     return { ok: true, message: newMessage };

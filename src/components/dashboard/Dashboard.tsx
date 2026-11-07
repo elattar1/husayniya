@@ -44,6 +44,7 @@ import { saveStore, saveProduct, deleteProduct, approveStore, updateRequest, tra
 import { allowedNext, earnings, type LedgerRow, type RequestKind } from "@/lib/dashboard-rules";
 import { money, dateAr, STATUS_LABELS } from "@/lib/labels";
 import { cleanOrderNotes } from "@/lib/utils";
+import { cleanDisplayAddress } from "@/lib/map-utils";
 import { OrderChatDialog } from "@/components/OrderChatDialog";
 
 type StoreRow = DashboardData["stores"][number];
@@ -718,9 +719,21 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
                   <h3 className="font-sans text-sm font-semibold">{admin ? storeName(t.store_id) : t.detail.slice(0, 70)}</h3>
                   <p className="mt-1 text-xs text-muted-foreground">{dateAr(t.created_at)}</p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   <StatusBadge status={t.status} />
                   <span className="text-sm font-semibold">{money(t.amount)}</span>
+                  {t.kind === "orders" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1.5 text-xs font-bold text-primary border-primary/30 hover:bg-primary/10"
+                      onClick={() => setChatOrderId(t.id)}
+                      title="محادثة العميل"
+                    >
+                      <MessageCircle className="size-3.5" />
+                      محادثة العميل
+                    </Button>
+                  )}
                   <Button variant="outline" size="sm" onClick={() => setDetail(t)}>
                     التفاصيل <ArrowLeft />
                   </Button>
@@ -1094,7 +1107,7 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
                   {currentDetail.appointment}
                 </p>
               )}
-              <p className="text-sm">العنوان: {currentDetail.address || "داخل العيادة"}</p>
+              <p className="text-sm">العنوان: {cleanDisplayAddress(currentDetail.address) || "داخل العيادة"}</p>
               <p className="text-sm">
                 الهاتف:{" "}
                 <a dir="ltr" href={`tel:${currentDetail.phone}`} className="text-primary">
@@ -1114,7 +1127,7 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
                     onClick={() => setChatOrderId(currentDetail.id)}
                   >
                     <MessageCircle className="size-4" />
-                    محادثة الكابتن والعميل
+                    محادثة العميل والكابتن
                   </Button>
                 </div>
               )}

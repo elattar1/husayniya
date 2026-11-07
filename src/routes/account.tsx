@@ -34,7 +34,7 @@ import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { pageMeta } from "@/lib/page-meta";
 import { MapLocationPicker } from "@/components/MapLocationPicker";
-import { extractCoordinates } from "@/lib/map-utils";
+import { extractCoordinates, cleanDisplayAddress, formatAddressWithCoordinates } from "@/lib/map-utils";
 
 export const Route = createFileRoute("/account")({
   head: () => pageMeta("حسابي", "إدارة الملف الشخصي، العناوين، الشكاوى والاقتراحات، وطلبات الانضمام"),
@@ -149,7 +149,7 @@ function AccountPage() {
         .maybeSingle();
 
       if (addr) {
-        if (addr.address) setAddressText(addr.address);
+        if (addr.address) setAddressText(cleanDisplayAddress(addr.address));
         if (!phoneNumber && addr.phone) setPhoneNumber(addr.phone);
       }
     }

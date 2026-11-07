@@ -3,7 +3,7 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { useSuspenseQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { useState } from 'react';
-import { RefreshCw, Package, Check, X, MapPin, MessageCircle } from 'lucide-react';
+import { RefreshCw, Package, Check, X, MapPin, MessageCircle, Store, Bike } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/AppShell';
@@ -14,6 +14,7 @@ import { flows, type RequestKind } from '@/lib/dashboard-rules';
 import { dateAr, money, STATUS_LABELS } from '@/lib/labels';
 import { pageMeta } from '@/lib/page-meta';
 import { cleanOrderNotes } from '@/lib/utils';
+import { cleanDisplayAddress } from '@/lib/map-utils';
 import { CustomerError, CustomerNotFound } from '@/components/CustomerFeedback';
 import { PushNotificationControls } from '@/components/PushNotificationControls';
 import { OrderChatDialog } from '@/components/OrderChatDialog';
@@ -209,11 +210,24 @@ function Orders() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="gap-2 border-primary/40 text-primary hover:bg-primary/10 font-bold"
+                    className={`gap-2 font-bold ${
+                      r.status === 'on_the_way' || r.status === 'delivered'
+                        ? 'border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10'
+                        : 'border-primary/40 text-primary hover:bg-primary/10'
+                    }`}
                     onClick={() => setChatOrderId(r.id)}
                   >
-                    <MessageCircle className="size-4" />
-                    محادثة كابتن التوصيل
+                    {r.status === 'on_the_way' || r.status === 'delivered' ? (
+                      <>
+                        <Bike className="size-4" />
+                        محادثة كابتن التوصيل 🛵
+                      </>
+                    ) : (
+                      <>
+                        <Store className="size-4" />
+                        محادثة المتجر / السوبرماركت 🏪
+                      </>
+                    )}
                   </Button>
                 )}
 
@@ -246,7 +260,7 @@ function Orders() {
                   {r.appointment && <p>الموعد: {r.appointment}</p>}
                   <p className="flex items-start gap-2">
                     <MapPin size={15} />
-                    {r.address}
+                    {cleanDisplayAddress(r.address)}
                   </p>
                   <p>الهاتف: {r.phone}</p>
                   {cleanNotes && <p className="text-muted-foreground">ملاحظات: {cleanNotes}</p>}
