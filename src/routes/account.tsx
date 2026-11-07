@@ -22,6 +22,8 @@ import {
   ShoppingBag,
   ArrowRightLeft,
   Sparkles,
+  Crosshair,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -31,6 +33,8 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/compone
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { pageMeta } from "@/lib/page-meta";
+import { MapLocationPicker } from "@/components/MapLocationPicker";
+import { extractCoordinates } from "@/lib/map-utils";
 
 export const Route = createFileRoute("/account")({
   head: () => pageMeta("حسابي", "إدارة الملف الشخصي، العناوين، الشكاوى والاقتراحات، وطلبات الانضمام"),
@@ -96,6 +100,7 @@ function AccountPage() {
   const [fullName, setFullName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [addressText, setAddressText] = useState("");
+  const [mapPickerOpen, setMapPickerOpen] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
 
   // Complaint Form state
@@ -574,8 +579,20 @@ function AccountPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="mb-1.5 block text-sm font-medium">عنواني بالتفصيل</label>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-sm font-medium">عنواني بالتفصيل</label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setMapPickerOpen(true)}
+                    className="text-xs h-7 gap-1 border-primary/30 text-primary hover:bg-primary/10 font-bold"
+                  >
+                    <Crosshair className="size-3" />
+                    تحديد على الخريطة (GPS)
+                  </Button>
+                </div>
                 <div className="relative">
                   <MapPin className="absolute right-3 top-3 size-4 text-muted-foreground" />
                   <Input
@@ -585,6 +602,21 @@ function AccountPage() {
                     onChange={(e) => setAddressText(e.target.value)}
                   />
                 </div>
+                {extractCoordinates(addressText) && (
+                  <div className="flex items-center justify-between rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 text-xs text-emerald-800 dark:text-emerald-200">
+                    <span className="flex items-center gap-1 font-medium">
+                      <Check className="size-3.5 text-emerald-600" />
+                      تم تثبيت الإحداثيات على الخريطة 📍
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setMapPickerOpen(true)}
+                      className="underline font-bold hover:text-emerald-900 cursor-pointer text-[11px]"
+                    >
+                      تعديل
+                    </button>
+                  </div>
+                )}
               </div>
 
               <Button type="submit" disabled={savingProfile} className="w-full sm:w-auto">
@@ -988,6 +1020,15 @@ function AccountPage() {
           </form>
         </DialogContent>
       </Dialog>
+      {/* نافذة تحديد الموقع على الخريطة */}
+      <MapLocationPicker
+        open={mapPickerOpen}
+        onOpenChange={setMapPickerOpen}
+        initialAddress={addressText}
+        onConfirm={(full) => {
+          setAddressText(full);
+        }}
+      />
     </div>
   );
 }
