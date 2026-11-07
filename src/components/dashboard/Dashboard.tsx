@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { Link } from "@tanstack/react-router";
 import { useSuspenseQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -47,6 +47,7 @@ import { money, dateAr, STATUS_LABELS } from "@/lib/labels";
 import { cleanOrderNotes } from "@/lib/utils";
 import { cleanDisplayAddress } from "@/lib/map-utils";
 import { OrderChatDialog } from "@/components/OrderChatDialog";
+import { useAuth } from "@/lib/auth";
 
 type StoreRow = DashboardData["stores"][number];
 type ProductRow = DashboardProduct;
@@ -61,10 +62,50 @@ function tasksFrom(data: DashboardData): Task[] {
 }
 
 export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: boolean; search: string; onSearch: (s: string) => void; tab: string; onTab: (s: string) => void }) {
+  const { user } = useAuth();
   const { data } = useSuspenseQuery(dashboardQuery(admin));
   const client = useQueryClient();
-  const [selectedStore, setSelectedStore] = useState("");
+
+  // مفتاح تخزين المتجر الافتراضي المفضل لصاحب المتجر ليبقى ثابتاً في كل زيارة
+  const storageKey = user ? `husayniya_default_store_${user.id}` : "husayniya_default_store";
+
+  // استرجاع المتجر الافتراضي المفضل المحفوظ سابقاً
+  const [selectedStore, setSelectedStore] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem(storageKey);
+        if (saved && data.stores.some(s => s.id === saved)) {
+          return saved;
+        }
+      } catch {}
+    }
+    return "";
+  });
+
   const store = data.stores.find(s => s.id === selectedStore) ?? data.stores[0];
+
+  // مزامنة وحفظ المتجر الافتراضي تلقائياً عند الدخول أو التغيير
+  useEffect(() => {
+    if (!admin && store?.id && typeof window !== "undefined") {
+      try {
+        localStorage.setItem(storageKey, store.id);
+      } catch {}
+    }
+  }, [admin, store?.id, storageKey]);
+
+  const handleSelectStore = (storeId: string) => {
+    setSelectedStore(storeId);
+    onSearch("");
+    if (!admin && typeof window !== "undefined") {
+      try {
+        localStorage.setItem(storageKey, storeId);
+        const stName = data.stores.find(s => s.id === storeId)?.name;
+        if (stName) {
+          toast.success(`تم تعيين «${stName}» كمتجر افتراضي لحسابك بنجاح ⭐`);
+        }
+      } catch {}
+    }
+  };
   const [storeEdit, setStoreEdit] = useState<StoreRow | "new" | null>(null);
   const [productEdit, setProductEdit] = useState<ProductRow | "new" | null>(null);
   const [approval, setApproval] = useState<StoreRow | null>(null);
@@ -248,7 +289,27 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
           <div className="mb-1 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
             {admin ? <ShieldCheck size={16} className="text-purple-600" /> : <Store size={16} className="text-primary" />} خدمات الحسينية / {admin ? "لوحة الإدارة السحابية" : "بوابة التاجر والمحل"}
           </div>
-          <h1 className="text-2xl font-bold">{admin ? "لوحة الإدارة والتحكم" : store?.name ?? "إدارة المتجر"}</h1>
+          {!admin && data.stores.length > 1 ? (
+            <div className="flex flex-wrap items-center gap-2.5 mt-1">
+              <select
+                aria-label="تبديل النشاط التجاري الافتراضي"
+                className="rounded-xl border border-primary/40 bg-card px-3 py-1.5 text-lg font-bold text-foreground focus:ring-2 focus:ring-primary focus:outline-none shadow-xs"
+                value={store?.id ?? ""}
+                onChange={e => handleSelectStore(e.target.value)}
+              >
+                {data.stores.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} {s.category ? `(${data.categories.find(c => c.slug === s.category)?.name ?? s.category})` : ""}
+                  </option>
+                ))}
+              </select>
+              <span className="text-[11px] font-semibold text-primary bg-primary/10 border border-primary/20 px-2.5 py-0.5 rounded-full">
+                الافتراضي النشط ⭐
+              </span>
+            </div>
+          ) : (
+            <h1 className="text-2xl font-bold">{admin ? "لوحة الإدارة والتحكم" : store?.name ?? "إدارة المتجر"}</h1>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" aria-label="تحديث البيانات" title="تحديث البيانات" onClick={() => client.invalidateQueries({ queryKey: ["dashboard"] })}>
@@ -357,7 +418,7 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
                             variant="outline"
                             className="flex-1 h-7 text-xs"
                             onClick={() => {
-                              setSelectedStore(ts.id);
+                              handleSelectStore(ts.id);
                               onTab("products");
                             }}
                           >
@@ -467,7 +528,7 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
                           variant="outline"
                           className="h-8 gap-1 text-xs"
                           onClick={() => {
-                            setSelectedStore(s.id);
+                            handleSelectStore(s.id);
                             onTab("products");
                           }}
                         >
@@ -515,8 +576,7 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
                       className="max-w-64 bg-transparent text-lg font-bold"
                       value={store.id}
                       onChange={e => {
-                        setSelectedStore(e.target.value);
-                        onSearch("");
+                        handleSelectStore(e.target.value);
                       }}
                     >
                       {data.stores.map(s => (
@@ -635,8 +695,7 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
                     className="bg-transparent text-base font-bold text-foreground focus:outline-none"
                     value={store?.id ?? ""}
                     onChange={e => {
-                      setSelectedStore(e.target.value);
-                      onSearch("");
+                      handleSelectStore(e.target.value);
                     }}
                   >
                     {data.stores.map(s => (
