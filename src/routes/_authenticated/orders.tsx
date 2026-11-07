@@ -2,7 +2,7 @@ import type { SearchSchemaInput } from '@tanstack/react-router';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useSuspenseQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { RefreshCw, Package, Check, X, MapPin, MessageCircle, Store, Bike, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -21,10 +21,11 @@ import { OrderChatDialog } from '@/components/OrderChatDialog';
 import { OrderReviewDialog } from '@/components/OrderReviewDialog';
 
 export const Route = createFileRoute('/_authenticated/orders')({
-  validateSearch: (s: SearchSchemaInput & { filter?: unknown }) => ({
+  validateSearch: (s: SearchSchemaInput & { filter?: unknown; chat?: unknown }) => ({
     filter: ['all', 'active', 'completed', 'cancelled'].includes(String(s.filter))
       ? String(s.filter)
       : 'all',
+    chat: typeof s.chat === 'string' ? s.chat : undefined,
   }),
   loader: async ({ context }) => {
     await Promise.all([
@@ -43,15 +44,22 @@ function Orders() {
   const { data: catalog } = useSuspenseQuery(catalogQuery);
   const client = useQueryClient();
   const cancel = useServerFn(cancelCustomerRequest);
-  const [busy, setBusy] = useState('');
-  const [chatOrderId, setChatOrderId] = useState<string | null>(null);
-  const [reviewOrder, setReviewOrder] = useState<any | null>(null);
-  const { filter } = Route.useSearch();
+  const { filter, chat } = Route.useSearch();
   const navigate = Route.useNavigate();
+  const [busy, setBusy] = useState('');
+  const [chatOrderId, setChatOrderId] = useState<string | null>(chat || null);
+  const [reviewOrder, setReviewOrder] = useState<any | null>(null);
+
+  useEffect(() => {
+    if (chat) {
+      setChatOrderId(chat);
+    }
+  }, [chat]);
 
   // Auto-prompt rating dialog if there is a freshly delivered order not yet reviewed
   useEffect(() => {
-    const delivered = data.orders.find((o) => o.status === 'delivered');
+    const ordersList = data?.orders ?? [];
+    const delivered = ordersList.find((o) => o.status === 'delivered');
     if (delivered) {
       try {
         const reviewed = localStorage.getItem(`order_reviewed_${delivered.id}`);
@@ -60,10 +68,10 @@ function Orders() {
         }
       } catch {}
     }
-  }, [data.orders]);
+  }, [data?.orders]);
 
   const rows = [
-    ...data.orders.map((o) => ({
+    ...(data?.orders ?? []).map((o) => ({
       id: o.id,
       kind: 'orders' as const,
       store_id: o.store_id,
@@ -74,12 +82,12 @@ function Orders() {
       address: o.address,
       phone: o.phone,
       notes: o.notes,
-      items: o.order_items,
+      items: o.order_items ?? [],
       driver_id: (o as any).driver_id,
       appointment: '',
       images: 0,
     })),
-    ...data.bookings.map((o) => ({
+    ...(data?.bookings ?? []).map((o) => ({
       id: o.id,
       kind: 'bookings' as const,
       store_id: o.store_id,
@@ -95,7 +103,7 @@ function Orders() {
       appointment: `${o.booking_date} • ${o.booking_time}`,
       images: 0,
     })),
-    ...data.services.map((o) => ({
+    ...(data?.services ?? []).map((o) => ({
       id: o.id,
       kind: 'service_requests' as const,
       store_id: o.store_id,
@@ -109,7 +117,7 @@ function Orders() {
       items: [],
       driver_id: null,
       appointment: o.preferred_date ?? '',
-      images: o.image_paths.length,
+      images: o.image_paths?.length ?? 0,
     })),
   ].sort((a, b) => b.created_at.localeCompare(a.created_at));
 
@@ -185,7 +193,7 @@ function Orders() {
                     {r.id.slice(0, 8)}
                   </p>
                   <h2 className="text-lg font-bold">
-                    {catalog.stores.find((s) => s.id === r.store_id)?.name ?? 'متجر غير متاح حاليًا'}
+                    {catalog?.stores?.find((s) => s.id === r.store_id)?.name ?? 'متجر غير متاح حاليًا'}
                   </h2>
                   <p className="mt-2 text-xs text-muted-foreground">{dateAr(r.created_at)}</p>
                 </div>
@@ -332,7 +340,7 @@ function Orders() {
       <OrderReviewDialog
         orderId={reviewOrder?.id ?? null}
         storeId={reviewOrder?.store_id ?? null}
-        storeName={catalog.stores.find((s) => s.id === reviewOrder?.store_id)?.name ?? "المتجر"}
+        storeName={catalog?.stores?.find((s) => s.id === reviewOrder?.store_id)?.name ?? "المتجر"}
         hasDriver={!!reviewOrder?.driver_id}
         open={!!reviewOrder}
         onOpenChange={(open) => !open && setReviewOrder(null)}

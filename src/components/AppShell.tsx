@@ -81,7 +81,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             {appMode === "customer" && (
               <>
                 <Link to="/" activeProps={active} activeOptions={{ exact: true }}>الرئيسية</Link>
-                {user && <Link to="/orders" activeProps={active}>طلباتي</Link>}
+                <Link to={user ? "/orders" : "/auth"} activeProps={active}>طلباتي</Link>
               </>
             )}
 
@@ -173,7 +173,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               </div>
               السلة
             </Link>
-            <Link to="/orders" className={navItem} activeProps={active}>
+            <Link to={user ? "/orders" : "/auth"} className={navItem} activeProps={active}>
               <ClipboardList className="h-5 w-5" />طلباتي
             </Link>
           </>
