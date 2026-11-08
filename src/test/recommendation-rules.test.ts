@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { matchRecommendations } from '@/lib/recommendation-matcher';
+import { REAL_STORES, REAL_PRODUCTS } from '@/lib/real-stores-data';
 import { gatewayFailure, groundRecommendations, recommendationInput } from '@/lib/recommendation-rules';
 
 describe('AI service recommendations', () => {
@@ -19,5 +21,22 @@ describe('AI service recommendations', () => {
   it('preserves upstream denial status and safe reason and persists the block', () => {
     expect(gatewayFailure(403, { error: { message: 'Access denied' } })).toEqual({ status: 403, message: 'Access denied', persist: true });
     expect(gatewayFailure(402, { message: 'Add credits' })).toEqual({ status: 402, message: 'Add credits', persist: false });
+  });
+
+  it('responds with humorous Egyptian reply when user searches for unrelated topics', () => {
+    const marriageRes = matchRecommendations('عايز اتجوز عروسة', null, REAL_STORES, REAL_PRODUCTS);
+    expect(marriageRes.suggestions).toHaveLength(0);
+    expect(marriageRes.summary).toContain('مأذون شرعي');
+
+    const rocketRes = matchRecommendations('صاروخ فضائي للمريخ', null, REAL_STORES, REAL_PRODUCTS);
+    expect(rocketRes.suggestions).toHaveLength(0);
+    expect(rocketRes.summary).toContain('توكتوك');
+
+    const dinosaurRes = matchRecommendations('عايز اشتري ديناصور واسد', null, REAL_STORES, REAL_PRODUCTS);
+    expect(dinosaurRes.suggestions).toHaveLength(0);
+    expect(dinosaurRes.summary).toContain('حديقة حيوانات');
+
+    const realStoreRes = matchRecommendations('كباب وكفتة من الباز', null, REAL_STORES, REAL_PRODUCTS);
+    expect(realStoreRes.suggestions.length).toBeGreaterThan(0);
   });
 });

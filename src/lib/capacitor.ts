@@ -49,4 +49,31 @@ export async function initCapacitorApp(): Promise<void> {
   } catch (err) {
     console.warn('[Capacitor] SplashScreen hide error:', err);
   }
+
+  try {
+    // 4. Handle Deep Linking for OAuth (e.g. returning from Chrome back into app)
+    App.addListener('appUrlOpen', async ({ url }) => {
+      try {
+        const parsed = new URL(url);
+        // Supabase sends tokens in URL fragment (#access_token=...&refresh_token=...)
+        if (parsed.hash) {
+          const hashParams = new URLSearchParams(parsed.hash.replace(/^#/, ''));
+          const accessToken = hashParams.get('access_token');
+          const refreshToken = hashParams.get('refresh_token');
+          if (accessToken && refreshToken) {
+            const { supabase } = await import('@/integrations/supabase/client');
+            await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+            window.location.href = '/';
+          }
+        }
+      } catch (err) {
+        console.warn('[Capacitor] appUrlOpen error:', err);
+      }
+    });
+  } catch (err) {
+    console.warn('[Capacitor] appUrlOpen listener setup error:', err);
+  }
 }

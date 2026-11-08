@@ -1,7 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { Store, ArrowLeft, LoaderCircle, ShieldCheck, CheckCircle2 } from "lucide-react";
+import { Store, ArrowLeft, LoaderCircle, ShieldCheck, CheckCircle2, Mail, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { lovable } from "@/integrations/lovable";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -45,8 +46,49 @@ function Auth() {
   const { redirect } = Route.useSearch();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [showEmailAuth, setShowEmailAuth] = useState(false);
 
-  // تسجيل الدخول بواسطة Google فقط
+  // تسجيل الدخول بواسطة البريد الإلكتروني وكلمة المرور مباشرة داخل التطبيق
+  async function handleEmailAuth(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email.trim() || !password.trim()) {
+      setError("يرجى إدخال البريد الإلكتروني وكلمة المرور");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      if (isSignUp) {
+        const { data, error: signUpErr } = await supabase.auth.signUp({
+          email: email.trim(),
+          password: password.trim(),
+        });
+        if (signUpErr) throw signUpErr;
+        if (data.session) {
+          navigate({ to: redirect.startsWith("/admin") ? "/admin" : redirect || "/" });
+        } else {
+          setError("تم تسجيل الحساب بنجاح! يمكنك الآن تسجيل الدخول مباشرة.");
+          setIsSignUp(false);
+        }
+      } else {
+        const { error: signInErr } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password: password.trim(),
+        });
+        if (signInErr) throw signInErr;
+        navigate({ to: redirect.startsWith("/admin") ? "/admin" : redirect || "/" });
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "فشل تسجيل الدخول، يرجى التأكد من البيانات.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // تسجيل الدخول بواسطة Google
   async function signInGoogle() {
     setBusy(true);
     setError("");

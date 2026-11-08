@@ -197,53 +197,93 @@ export function ServiceRecommendations({ catalog, area }: { catalog: Catalog; ar
             {error && <p role="alert" className="mt-4 text-sm text-destructive">{error}</p>}
             {result && (
               <div className="mt-6 border-t pt-5">
-                <p className="mb-4 text-sm font-semibold text-foreground">{result.summary}</p>
-                <div className="grid gap-3 md:grid-cols-3">
-                  {result.suggestions.map((suggestion) => {
-                    const store = catalog.stores.find((s) => s.id === suggestion.store_id);
-                    if (!store) return null;
-                    return (
-                      <Link
-                        key={store.id}
-                        to="/stores/$storeId"
-                        params={{ storeId: store.id }}
-                        className="group flex flex-col justify-between rounded-xl border bg-card p-4 transition-all hover:border-primary hover:shadow-md"
-                      >
-                        <div>
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2 min-w-0">
-                              {store.logo_url ? (
-                                <img
-                                  src={store.logo_url}
-                                  alt=""
-                                  loading="lazy"
-                                  className="size-9 rounded-lg object-cover border"
-                                />
-                              ) : (
-                                <span className="grid size-9 place-items-center rounded-lg bg-secondary text-lg">
-                                  {CATEGORY_ICONS[store.category]}
-                                </span>
-                              )}
-                              <h3 className="truncate text-base font-semibold group-hover:text-primary transition-colors">
-                                {store.name}
-                              </h3>
+                {result.suggestions.length > 0 ? (
+                  <>
+                    <p className="mb-4 text-sm font-semibold text-foreground">{result.summary}</p>
+                    <div className="grid gap-3 md:grid-cols-3">
+                      {result.suggestions.map((suggestion) => {
+                        const store = catalog.stores.find((s) => s.id === suggestion.store_id);
+                        if (!store) return null;
+                        return (
+                          <Link
+                            key={store.id}
+                            to="/stores/$storeId"
+                            params={{ storeId: store.id }}
+                            className="group flex flex-col justify-between rounded-xl border bg-card p-4 transition-all hover:border-primary hover:shadow-md"
+                          >
+                            <div>
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  {store.logo_url ? (
+                                    <img
+                                      src={store.logo_url}
+                                      alt=""
+                                      loading="lazy"
+                                      className="size-9 rounded-lg object-cover border"
+                                    />
+                                  ) : (
+                                    <span className="grid size-9 place-items-center rounded-lg bg-secondary text-lg">
+                                      {CATEGORY_ICONS[store.category]}
+                                    </span>
+                                  )}
+                                  <h3 className="truncate text-base font-semibold group-hover:text-primary transition-colors">
+                                    {store.name}
+                                  </h3>
+                                </div>
+                                <ArrowLeft className="size-4 shrink-0 text-primary transition-transform group-hover:-translate-x-1" />
+                              </div>
+                              <p className="mb-3 mt-2 break-words text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                                {suggestion.reason}
+                              </p>
                             </div>
-                            <ArrowLeft className="size-4 shrink-0 text-primary transition-transform group-hover:-translate-x-1" />
-                          </div>
-                          <p className="mb-3 mt-2 break-words text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                            {suggestion.reason}
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap justify-between gap-2 border-t pt-2 text-xs text-muted-foreground">
-                          <span>{catalog.areas.find((a) => a.id === store.area_id)?.name ?? 'الحسينية'}</span>
-                          <span className={store.is_open ? 'text-emerald-600 font-semibold' : ''}>
-                            {store.is_open ? '🟢 مفتوح الآن' : '⚪ مغلق'}
-                          </span>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
+                            <div className="flex flex-wrap justify-between gap-2 border-t pt-2 text-xs text-muted-foreground">
+                              <span>{catalog.areas.find((a) => a.id === store.area_id)?.name ?? 'الحسينية'}</span>
+                              <span className={store.is_open ? 'text-emerald-600 font-semibold' : ''}>
+                                {store.is_open ? '🟢 مفتوح الآن' : '⚪ مغلق'}
+                              </span>
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </>
+                ) : (
+                  <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5 text-center sm:p-6 space-y-4">
+                    <div className="inline-flex items-center justify-center size-12 rounded-2xl bg-primary/10 text-2xl">
+                      😂
+                    </div>
+                    <p className="text-base font-semibold leading-relaxed text-foreground md:text-lg max-w-xl mx-auto">
+                      {result.summary}
+                    </p>
+                    <div className="pt-2">
+                      <p className="text-xs text-muted-foreground mb-3 font-medium">
+                        جرّب تبحث عن حاجات متوفرة عندنا في الحسينية:
+                      </p>
+                      <div className="flex flex-wrap items-center justify-center gap-2">
+                        {[
+                          'كباب وكفتة من الباز',
+                          'بيتزا مقرمشة من السندباد',
+                          'سباك شاطر لتسريب الحوض',
+                          'صيدلية 24 ساعة',
+                          'دكتور باطنة وأطفال',
+                          'طلبات سوبر ماركت وبقالة',
+                        ].map((hint) => (
+                          <button
+                            key={hint}
+                            type="button"
+                            onClick={() => {
+                              setDescription(hint);
+                              performSearch(hint);
+                            }}
+                            className="rounded-xl border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:border-primary hover:text-primary hover:bg-primary/5 transition-all cursor-pointer shadow-xs"
+                          >
+                            {hint}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

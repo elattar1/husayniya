@@ -7,6 +7,14 @@
 html, body {
   max-width: 100vw;
   overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+button, a, nav, [role="button"], [role="tab"] {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 @theme inline {
