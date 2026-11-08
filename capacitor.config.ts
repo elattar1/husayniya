@@ -6,9 +6,7 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   bundledWebRuntime: false,
   server: {
-    // If you want the native app to connect directly to the live deployed site
-    // (giving instant updates, live server functions, and real-time chat without app store republishing):
-    // set CAPACITOR_SERVER_URL in your environment or enter your domain here.
+    url: 'https://husayniya.lovable.app',
     androidScheme: 'https',
     cleartext: true,
   },
