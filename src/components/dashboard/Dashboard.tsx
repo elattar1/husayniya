@@ -335,28 +335,28 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 pt-6 pb-32 md:px-6 md:pt-8 md:pb-20">
+    <div className="mx-auto max-w-6xl w-full overflow-x-clip px-4 pt-6 pb-36 md:px-6 md:pt-8 md:pb-24">
       {/* شريط العنوان والتحديث */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b pb-4">
-        <div>
+        <div className="min-w-0 max-w-full">
           <div className="mb-1 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
             {admin ? <ShieldCheck size={16} className="text-purple-600" /> : <Store size={16} className="text-primary" />} خدمات الحسينية / {admin ? "لوحة الإدارة السحابية" : "بوابة التاجر والمحل"}
           </div>
           {!admin && data.stores.length > 1 ? (
-            <div className="flex flex-wrap items-center gap-2.5 mt-1">
+            <div className="flex flex-wrap items-center gap-2 mt-1 min-w-0 max-w-full">
               <select
                 aria-label="تبديل النشاط التجاري الافتراضي"
-                className="rounded-xl border border-primary/40 bg-card px-3 py-1.5 text-lg font-bold text-foreground focus:ring-2 focus:ring-primary focus:outline-none shadow-xs"
+                className="w-full max-w-[calc(100vw-6rem)] sm:max-w-xs truncate rounded-xl border border-primary/40 bg-card px-3 py-1.5 text-base font-bold text-foreground focus:ring-2 focus:ring-primary focus:outline-none shadow-xs"
                 value={store?.id ?? ""}
                 onChange={e => handleSelectStore(e.target.value)}
               >
                 {data.stores.map(s => (
                   <option key={s.id} value={s.id}>
-                    {s.name} {s.category ? `(${data.categories.find(c => c.slug === s.category)?.name ?? s.category})` : ""}
+                    {s.name}
                   </option>
                 ))}
               </select>
-              <span className="text-[11px] font-semibold text-primary bg-primary/10 border border-primary/20 px-2.5 py-0.5 rounded-full">
+              <span className="shrink-0 text-[10px] font-semibold text-primary bg-primary/10 border border-primary/20 px-2.5 py-0.5 rounded-full">
                 الافتراضي النشط ⭐
               </span>
             </div>
@@ -670,15 +670,15 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
           ) : store ? (
             <div className="space-y-6">
               {/* شريط المتجر وحالة العمل والتعديل السريع */}
-              <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border bg-card p-4 shadow-soft">
-                <div className="flex items-center gap-3">
-                  <div className="grid size-12 place-items-center rounded-lg bg-primary/10 text-primary">
-                    <Store />
+              <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border bg-card p-4 shadow-soft max-w-full overflow-hidden">
+                <div className="flex items-center gap-3 min-w-0 max-w-full flex-1">
+                  <div className="grid size-11 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+                    <Store className="size-5" />
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <select
                       aria-label="المتجر الحالي"
-                      className="max-w-64 bg-transparent text-lg font-bold"
+                      className="w-full max-w-[240px] sm:max-w-xs truncate bg-transparent text-base font-bold text-foreground focus:outline-none"
                       value={store.id}
                       onChange={e => {
                         handleSelectStore(e.target.value);
@@ -690,7 +690,7 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
                         </option>
                       ))}
                     </select>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground truncate">
                       {store.is_active ? "متجر معتمد ونشط" : "بانتظار اعتماد الإدارة"} • عمولة {store.commission_rate}٪
                     </p>
                   </div>
@@ -833,15 +833,15 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
           </div>
           {/* محدد المتجر للمدير العام حتى يتمكن من إدارة منيو أي متجر في المنظومة */}
           {admin && (
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4 shadow-soft">
-              <div className="flex items-center gap-3">
-                <div className="grid size-10 place-items-center rounded-lg bg-primary/10 text-primary">
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-3.5 sm:p-4 shadow-soft max-w-full overflow-hidden">
+              <div className="flex items-center gap-3 min-w-0 max-w-full flex-1">
+                <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
                   <Store className="size-5" />
                 </div>
-                <div>
-                  <label className="text-xs text-muted-foreground block font-medium">المتجر المحدد لإدارة المنيو والمنتجات:</label>
+                <div className="min-w-0 flex-1">
+                  <label className="text-xs text-muted-foreground block font-medium">المتجر أو الكافيه المحدد لإدارة المنيو:</label>
                   <select
-                    className="bg-transparent text-base font-bold text-foreground focus:outline-none"
+                    className="w-full max-w-[260px] sm:max-w-md truncate bg-transparent text-sm sm:text-base font-bold text-foreground focus:outline-none"
                     value={store?.id ?? ""}
                     onChange={e => {
                       handleSelectStore(e.target.value);
@@ -856,9 +856,9 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 {store && (
-                  <Button asChild variant="outline" size="sm" className="gap-1.5 text-xs font-semibold">
+                  <Button asChild variant="outline" size="sm" className="h-8 gap-1.5 text-xs font-semibold">
                     <Link to="/stores/$storeId" params={{ storeId: store.id }} target="_blank">
                       <ExternalLink className="size-3.5" />
                       معاينة كعميل
@@ -1202,32 +1202,56 @@ export function Dashboard({ admin, search, onSearch, tab, onTab }: { admin: bool
 
           <div className="divide-y border-y">
             {visibleTasks.map(t => (
-              <div key={`${t.kind}-${t.id}`} className="flex flex-wrap items-center justify-between gap-4 py-5">
-                <div>
-                  <div className="mb-2 flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">{t.kind === "orders" ? "مشتريات" : t.kind === "bookings" ? "حجز موعد" : "خدمة منزلية"}</span>
-                    <span dir="ltr" className="font-mono text-xs">#{t.id.slice(0, 8)}</span>
+              <div key={`${t.kind}-${t.id}`} className="py-4 space-y-3">
+                {/* الكلام جمب بعض: رقم الطلب واسم المتجر/العميل والنوع والتاريخ والمبلغ وحالة الطلب */}
+                <div className="flex flex-wrap items-center justify-between gap-2.5">
+                  <div className="flex flex-wrap items-center gap-2 text-sm min-w-0">
+                    <span dir="ltr" className="font-mono text-xs font-bold bg-muted px-2 py-0.5 rounded-md text-foreground shrink-0">
+                      #{t.id.slice(0, 8)}
+                    </span>
+                    <span className="font-sans font-bold text-foreground text-sm truncate">
+                      {admin ? storeName(t.store_id) : t.detail.slice(0, 50)}
+                    </span>
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      ({t.kind === "orders" ? "طلب مشتريات" : t.kind === "bookings" ? "حجز موعد" : "خدمة منزلية"})
+                    </span>
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      • {dateAr(t.created_at)}
+                    </span>
                   </div>
-                  <h3 className="font-sans text-sm font-semibold">{admin ? storeName(t.store_id) : t.detail.slice(0, 70)}</h3>
-                  <p className="mt-1 text-xs text-muted-foreground">{dateAr(t.created_at)}</p>
+
+                  <div className="flex items-center gap-2.5 shrink-0">
+                    <span className="text-sm font-bold text-primary tabular-nums">{money(t.amount)}</span>
+                    <StatusBadge status={t.status} />
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <StatusBadge status={t.status} />
-                  <span className="text-sm font-semibold">{money(t.amount)}</span>
-                  {t.kind === "orders" && (
+
+                {/* تحت الكلام: الشات علي اليمين وعلي الشمال التفاصيل */}
+                <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/40">
+                  {/* الشات علي اليمين */}
+                  {t.kind === "orders" ? (
                     <Button
                       variant="outline"
                       size="sm"
                       className="h-8 gap-1.5 text-xs font-bold text-primary border-primary/30 hover:bg-primary/10"
                       onClick={() => setChatOrderId(t.id)}
-                      title="محادثة العميل"
+                      title="محادثة العميل والكابتن"
                     >
                       <MessageCircle className="size-3.5" />
                       محادثة العميل
                     </Button>
+                  ) : (
+                    <div />
                   )}
-                  <Button variant="outline" size="sm" onClick={() => setDetail(t)}>
-                    التفاصيل <ArrowLeft />
+
+                  {/* التفاصيل علي الشمال */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1.5 text-xs font-semibold"
+                    onClick={() => setDetail(t)}
+                  >
+                    التفاصيل <ArrowLeft className="size-3" />
                   </Button>
                 </div>
               </div>

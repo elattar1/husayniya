@@ -62,7 +62,7 @@ export function StoreProducts({
 
       {/* شريط الفئات العرضي الأفقي القابل للتمرير في أول المنيو */}
       {groups.length > 0 && (
-        <div className="sticky top-14 z-30 -mx-4 mb-7 border-b bg-background/95 px-4 py-2.5 backdrop-blur-md shadow-xs sm:mx-0 sm:rounded-2xl sm:border sm:px-3">
+        <div className="sticky top-14 z-30 mb-7 border bg-card/95 px-3 py-2.5 backdrop-blur-md shadow-xs rounded-2xl">
           <nav
             ref={navRef}
             aria-label="فئات المنيو"

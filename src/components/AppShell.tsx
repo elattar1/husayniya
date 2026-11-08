@@ -155,7 +155,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main className="min-h-screen pb-28 lg:pb-12">{children}</main>
+      <main className="min-h-screen pb-36 lg:pb-12">{children}</main>
 
       {/* الشريط السفلي للهواتف المحمولة: مخصص حسب الوضع النشط، مع بقاء حسابي أقصى الشمال دائمًا */}
       <nav className="glass-surface fixed inset-x-0 bottom-0 z-40 flex justify-around border-t py-1.5 px-1 lg:hidden">
