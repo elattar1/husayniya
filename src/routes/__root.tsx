@@ -18,6 +18,7 @@ import { AppShell } from "@/components/AppShell";
 import { Toaster } from "@/components/ui/sonner";
 import { InstallAppBanner } from "@/components/InstallAppBanner";
 import { InAppChatNotifier } from "@/components/InAppChatNotifier";
+import { initCapacitorApp } from "@/lib/capacitor";
 import { supabase } from "@/integrations/supabase/client";
 
 function NotFoundComponent() {
@@ -109,6 +110,10 @@ function RootShell({ children }: { children: ReactNode }) {
 }
 
 function RootComponent() {
+  useEffect(() => {
+    initCapacitorApp();
+  }, []);
+
   useEffect(() => {
     const removeBadge = () => {
       const selectors = [

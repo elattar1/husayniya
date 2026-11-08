@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Download, Share, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { isNativePlatform } from '@/lib/capacitor';
 
 type InstallEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
 const DISMISS_KEY = 'install-banner-dismissed-at';
@@ -14,7 +15,7 @@ export function InstallAppBanner() {
   useEffect(() => {
     const standalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone;
     const dismissed = Number(localStorage.getItem(DISMISS_KEY) || 0);
-    if (standalone || Date.now() - dismissed < DISMISS_DAYS * 864e5) return;
+    if (standalone || isNativePlatform() || Date.now() - dismissed < DISMISS_DAYS * 864e5) return;
     const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
     if (isIos) { setIos(true); setShow(true); }
     const onPrompt = (e: Event) => { e.preventDefault(); setEvent(e as InstallEvent); setShow(true); };

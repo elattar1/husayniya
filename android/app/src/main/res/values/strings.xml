@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">خدمات الحسينية</string>
+    <string name="title_activity_main">خدمات الحسينية</string>
+    <string name="package_name">com.husayniya.services</string>
+    <string name="custom_url_scheme">com.husayniya.services</string>
+</resources>
