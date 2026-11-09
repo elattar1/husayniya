@@ -36,6 +36,18 @@ describe('AI service recommendations', () => {
     expect(dinosaurRes.suggestions).toHaveLength(0);
     expect(dinosaurRes.summary).toContain('حديقة حيوانات');
 
+    const dietRes = matchRecommendations('عايز اخس دايت عشان الكرش', null, REAL_STORES, REAL_PRODUCTS);
+    expect(dietRes.suggestions).toHaveLength(0);
+    expect(dietRes.summary).toContain('الكرش');
+
+    const visaRes = matchRecommendations('عايز فيزا وسفر لكندا', null, REAL_STORES, REAL_PRODUCTS);
+    expect(visaRes.suggestions).toHaveLength(0);
+    expect(visaRes.summary).toContain('ترعة الإسماعيلية');
+
+    const magicRes = matchRecommendations('فك سحر وعمل سفلي وفنجان', null, REAL_STORES, REAL_PRODUCTS);
+    expect(magicRes.suggestions).toHaveLength(0);
+    expect(magicRes.summary).toContain('طاجن كوارع');
+
     const realStoreRes = matchRecommendations('كباب وكفتة من الباز', null, REAL_STORES, REAL_PRODUCTS);
     expect(realStoreRes.suggestions.length).toBeGreaterThan(0);
   });
