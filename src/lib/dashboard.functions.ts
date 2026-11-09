@@ -664,3 +664,134 @@ export const importCatalogProducts = createServerFn({ method: "POST" })
     if (result.error) throw new Error(result.error.message);
     return { count: result.data?.length ?? 0 };
   });
+
+export const sendBroadcastNotification = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    z.object({
+      title: z.string().trim().min(3, "عنوان الإشعار يجب أن لا يقل عن 3 أحرف").max(100),
+      body: z.string().trim().min(5, "نص الإشعار يجب أن لا يقل عن 5 أحرف").max(500),
+      target: z.string(),
+      path: z.string().optional(),
+    })
+  )
+  .handler(async ({ context, data }) => {
+    const roleCheck = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
+    if (roleCheck.error || !roleCheck.data) {
+      throw new Error("هذه العملية متاحة للإدارة فقط");
+    }
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    let targetUserIds: string[] = [];
+
+    if (data.target === "all") {
+      try {
+        const usersRes = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+        targetUserIds = (usersRes.data?.users ?? []).map((u) => u.id);
+      } catch (err) {
+        console.error("Failed to list auth users, falling back to profiles/roles:", err);
+        const [profRes, rolesRes] = await Promise.all([
+          supabaseAdmin.from("profiles").select("id"),
+          supabaseAdmin.from("user_roles").select("user_id"),
+        ]);
+        const ids = new Set<string>();
+        (profRes.data ?? []).forEach((p: any) => ids.add(p.id));
+        (rolesRes.data ?? []).forEach((r: any) => ids.add(r.user_id));
+        targetUserIds = Array.from(ids);
+      }
+    } else if (data.target === "stores_all") {
+      const storesRes = await supabaseAdmin.from("stores").select("owner_id").not("owner_id", "is", null);
+      targetUserIds = Array.from(new Set((storesRes.data ?? []).map((s: any) => s.owner_id).filter(Boolean)));
+    } else if (data.target.startsWith("category:")) {
+      const cat = data.target.replace("category:", "");
+      const storesRes = await supabaseAdmin.from("stores").select("owner_id").eq("category", cat).not("owner_id", "is", null);
+      targetUserIds = Array.from(new Set((storesRes.data ?? []).map((s: any) => s.owner_id).filter(Boolean)));
+    } else if (data.target === "drivers") {
+      const driversRes = await supabaseAdmin.from("drivers").select("user_id").not("user_id", "is", null);
+      targetUserIds = Array.from(new Set((driversRes.data ?? []).map((d: any) => d.user_id).filter(Boolean)));
+    }
+
+    if (targetUserIds.length === 0) {
+      return { success: true, count: 0, message: "لم يتم العثور على مستخدمين مسجلين في هذه الفئة حالياً" };
+    }
+
+    // 1. إدراج الإشعارات في قاعدة البيانات للمستخدمين
+    const now = new Date().toISOString();
+    const rows = targetUserIds.map((uid) => ({
+      user_id: uid,
+      title: data.title,
+      body: data.body,
+      is_read: false,
+      created_at: now,
+    }));
+
+    for (let i = 0; i < rows.length; i += 100) {
+      const chunk = rows.slice(i, i + 100);
+      const insertRes = await supabaseAdmin.from("notifications").insert(chunk);
+      if (insertRes.error) {
+        console.error("Batch insert notification error:", insertRes.error);
+      }
+    }
+
+    // 2. إرسال Push Notifications للهواتف المفعلة
+    try {
+      const { sendPushToUser } = await import("@/lib/push.functions");
+      Promise.allSettled(
+        targetUserIds.map((uid) =>
+          sendPushToUser(uid, {
+            title: data.title,
+            body: data.body,
+            path: data.path || "/",
+            tag: "broadcast-admin",
+          })
+        )
+      ).catch((e) => console.error("Broadcast push error:", e));
+    } catch (pushErr) {
+      console.warn("Could not import or trigger push notifications:", pushErr);
+    }
+
+    return {
+      success: true,
+      count: targetUserIds.length,
+      message: `تم إرسال الإشعار بنجاح إلى ${targetUserIds.length} مستخدم`,
+    };
+  });
+
+export const getBroadcastAudienceCount = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({ target: z.string() }))
+  .handler(async ({ context, data }) => {
+    const roleCheck = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
+    if (roleCheck.error || !roleCheck.data) {
+      throw new Error("هذه العملية متاحة للإدارة فقط");
+    }
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    let count = 0;
+    if (data.target === "all") {
+      try {
+        const usersRes = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+        count = usersRes.data?.users?.length ?? 0;
+      } catch {
+        const profRes = await supabaseAdmin.from("profiles").select("id", { count: "exact", head: true });
+        count = profRes.count ?? 0;
+      }
+    } else if (data.target === "stores_all") {
+      const storesRes = await supabaseAdmin.from("stores").select("owner_id").not("owner_id", "is", null);
+      const unique = new Set((storesRes.data ?? []).map((s: any) => s.owner_id).filter(Boolean));
+      count = unique.size;
+    } else if (data.target.startsWith("category:")) {
+      const cat = data.target.replace("category:", "");
+      const storesRes = await supabaseAdmin.from("stores").select("owner_id").eq("category", cat).not("owner_id", "is", null);
+      const unique = new Set((storesRes.data ?? []).map((s: any) => s.owner_id).filter(Boolean));
+      count = unique.size;
+    } else if (data.target === "drivers") {
+      const driversRes = await supabaseAdmin.from("drivers").select("user_id").not("user_id", "is", null);
+      const unique = new Set((driversRes.data ?? []).map((d: any) => d.user_id).filter(Boolean));
+      count = unique.size;
+    }
+
+    return { count };
+  });

@@ -1,12 +1,13 @@
 import type { SearchSchemaInput } from '@tanstack/react-router';
 import { createFileRoute, useRouter, Link } from "@tanstack/react-router";
-import { ShieldCheck, MessageSquareWarning } from "lucide-react";
+import { ShieldCheck, MessageSquareWarning, Megaphone } from "lucide-react";
 import { useState } from "react";
 import { Dashboard } from "@/components/dashboard/Dashboard";
 import { dashboardQuery } from "@/components/dashboard/queries";
 import { pageMeta } from "@/lib/page-meta";
 import { Button } from "@/components/ui/button";
 import { AdminComplaints } from "@/components/dashboard/AdminComplaints";
+import { AdminBroadcastNotification } from "@/components/dashboard/AdminBroadcastNotification";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   validateSearch: (s: SearchSchemaInput & { q?: unknown; tab?: unknown }) => ({
@@ -23,11 +24,26 @@ export const Route = createFileRoute("/_authenticated/admin")({
 function Admin() {
   const search = Route.useSearch(), navigate = Route.useNavigate();
   const [complaintsOpen, setComplaintsOpen] = useState(false);
+  const [broadcastOpen, setBroadcastOpen] = useState(false);
 
   return (
     <>
-      <div className="mx-auto flex max-w-6xl justify-end px-4 pt-4">
-        <Button variant="default" size="sm" onClick={() => setComplaintsOpen(true)} className="gap-2 font-bold shadow-soft">
+      <div className="mx-auto flex max-w-6xl justify-end gap-2.5 px-4 pt-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setBroadcastOpen(true)}
+          className="gap-2 font-bold border-primary text-primary hover:bg-primary/10 shadow-soft"
+        >
+          <Megaphone className="size-4" />
+          إرسال إشعار جماعي
+        </Button>
+        <Button
+          variant="default"
+          size="sm"
+          onClick={() => setComplaintsOpen(true)}
+          className="gap-2 font-bold shadow-soft"
+        >
           <MessageSquareWarning className="size-4" />
           الشكاوى والاقتراحات
         </Button>
@@ -42,6 +58,7 @@ function Admin() {
       />
 
       <AdminComplaints open={complaintsOpen} onOpenChange={setComplaintsOpen} />
+      <AdminBroadcastNotification open={broadcastOpen} onOpenChange={setBroadcastOpen} />
     </>
   );
 }
