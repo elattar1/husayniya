@@ -11,6 +11,8 @@ import {
   KeyRound,
   RotateCcw,
   Sparkles,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -94,6 +96,8 @@ function Auth() {
   const [authMode, setAuthMode] = useState<"signin" | "signup" | "otp_verify">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [otp, setOtp] = useState("");
   const [otpType, setOtpType] = useState<"signup" | "email">("signup");
 
@@ -165,6 +169,14 @@ function Auth() {
     }
     if (password.trim().length < 6) {
       setError("كلمة المرور يجب أن لا تقل عن 6 أحرف أو أرقام");
+      return;
+    }
+    if (!confirmPassword.trim()) {
+      setError("يرجى إدخال تأكيد كلمة المرور");
+      return;
+    }
+    if (password.trim() !== confirmPassword.trim()) {
+      setError("كلمتا المرور غير متطابقتين، يرجى التأكد من تطابق كلمة المرور وتأكيدها");
       return;
     }
     setBusy(true);
@@ -446,6 +458,7 @@ function Auth() {
                       setAuthMode("signin");
                       setError("");
                       setSuccessMsg("");
+                      setConfirmPassword("");
                     }}
                     className={`rounded-lg py-2 transition-all ${
                       authMode === "signin" ? "bg-background text-foreground shadow-xs font-bold" : "text-muted-foreground hover:text-foreground"
@@ -459,12 +472,13 @@ function Auth() {
                       setAuthMode("signup");
                       setError("");
                       setSuccessMsg("");
+                      setConfirmPassword("");
                     }}
                     className={`rounded-lg py-2 transition-all ${
                       authMode === "signup" ? "bg-background text-foreground shadow-xs font-bold" : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    حساب جديد (مع كود تأكيد)
+                    حساب جديد
                   </button>
                 </div>
 
@@ -495,24 +509,69 @@ function Auth() {
                       <span>كلمة المرور</span>
                       <Lock className="size-3.5 text-muted-foreground" />
                     </label>
-                    <Input
-                      type="password"
-                      required
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => {
-                        setPassword(e.target.value);
-                        setError("");
-                      }}
-                      disabled={busy}
-                      className="h-11 text-left"
-                      dir="ltr"
-                      minLength={6}
-                    />
+                    <div className="relative">
+                      <Input
+                        type={showPassword ? "text" : "password"}
+                        required
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => {
+                          setPassword(e.target.value);
+                          setError("");
+                        }}
+                        disabled={busy}
+                        className="h-11 text-left pl-10"
+                        dir="ltr"
+                        minLength={6}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 transition-colors"
+                        tabIndex={-1}
+                        aria-label={showPassword ? "إخفاء كلمة المرور" : "عرض كلمة المرور"}
+                      >
+                        {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                      </button>
+                    </div>
                     {authMode === "signup" && (
                       <p className="text-[11px] text-muted-foreground">يجب أن لا تقل كلمة المرور عن 6 أحرف أو أرقام</p>
                     )}
                   </div>
+
+                  {authMode === "signup" && (
+                    <div className="space-y-1.5 text-right">
+                      <label className="text-xs font-semibold text-foreground flex items-center gap-1.5 justify-end">
+                        <span>تأكيد كلمة المرور</span>
+                        <Lock className="size-3.5 text-muted-foreground" />
+                      </label>
+                      <div className="relative">
+                        <Input
+                          type={showPassword ? "text" : "password"}
+                          required
+                          placeholder="••••••••"
+                          value={confirmPassword}
+                          onChange={(e) => {
+                            setConfirmPassword(e.target.value);
+                            setError("");
+                          }}
+                          disabled={busy}
+                          className="h-11 text-left pl-10"
+                          dir="ltr"
+                          minLength={6}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 transition-colors"
+                          tabIndex={-1}
+                          aria-label={showPassword ? "إخفاء كلمة المرور" : "عرض كلمة المرور"}
+                        >
+                          {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   <Button type="submit" disabled={busy} className="h-11 w-full font-bold shadow-sm">
                     {busy ? (
@@ -522,7 +581,7 @@ function Auth() {
                     ) : (
                       <Sparkles className="size-4 ml-2" />
                     )}
-                    {authMode === "signin" ? "تسجيل الدخول" : "إنشاء حساب وإرسال كود التأكيد"}
+                    {authMode === "signin" ? "تسجيل الدخول" : "إنشاء حساب جديد"}
                   </Button>
 
                   {/* رابط إرسال كود دخول سريع بدون كلمة مرور */}
@@ -566,7 +625,7 @@ function Auth() {
                 <div className="rounded-xl border bg-muted/20 p-3 space-y-1.5 text-xs text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="size-4 text-primary shrink-0" />
-                    <span>حسابك محمي بتأكيد الكود عبر البريد الإلكتروني</span>
+                    <span>حسابك محمي وتشفير آمن لبياناتك وطلباتك</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
