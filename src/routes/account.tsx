@@ -24,6 +24,7 @@ import {
   Sparkles,
   Crosshair,
   Check,
+  UserX,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { pageMeta } from "@/lib/page-meta";
 import { MapLocationPicker } from "@/components/MapLocationPicker";
 import { extractCoordinates, cleanDisplayAddress, formatAddressWithCoordinates } from "@/lib/map-utils";
+import { DeleteAccountModal } from "@/components/DeleteAccountModal";
 
 export const Route = createFileRoute("/account")({
   head: () => pageMeta("حسابي", "إدارة الملف الشخصي، العناوين، الشكاوى والاقتراحات، وطلبات الانضمام"),
@@ -95,6 +97,7 @@ function AccountPage() {
   const [complaintsOpen, setComplaintsOpen] = useState(false);
   const [driverModalOpen, setDriverModalOpen] = useState(false);
   const [merchantModalOpen, setMerchantModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
   // Profile data
   const [fullName, setFullName] = useState("");
@@ -692,6 +695,22 @@ function AccountPage() {
               تسجيل الخروج
             </Button>
           </div>
+
+          {/* خيار حذف الحساب نهائياً */}
+          <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 shadow-soft space-y-2 text-center">
+            <p className="text-xs text-muted-foreground">
+              هل ترغب في مغادرة خدمات الحسينية نهائياً؟
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDeleteModalOpen(true)}
+              className="w-full text-xs font-bold text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive gap-1.5"
+            >
+              <UserX className="size-3.5" />
+              حذف حسابي
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -1028,6 +1047,12 @@ function AccountPage() {
         onConfirm={(full) => {
           setAddressText(full);
         }}
+      />
+
+      {/* نافذة حذف الحساب */}
+      <DeleteAccountModal
+        open={deleteModalOpen}
+        onOpenChange={setDeleteModalOpen}
       />
     </div>
   );

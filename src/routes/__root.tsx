@@ -18,6 +18,7 @@ import { AppShell } from "@/components/AppShell";
 import { Toaster } from "@/components/ui/sonner";
 import { InstallAppBanner } from "@/components/InstallAppBanner";
 import { InAppChatNotifier } from "@/components/InAppChatNotifier";
+import { AccountDeletionInterceptModal } from "@/components/AccountDeletionInterceptModal";
 import { initCapacitorApp } from "@/lib/capacitor";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -155,6 +156,7 @@ function RootComponent() {
           <Toaster position="top-center" richColors />
           <InstallAppBanner />
           <InAppChatNotifier />
+          <AccountDeletionInterceptModal />
         </CartProvider>
       </AuthProvider>
     </QueryClientProvider>

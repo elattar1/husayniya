@@ -208,8 +208,13 @@ function Auth() {
 
       // إذا كان يوجد مستخدم بالفعل، يتم إبلاغه وتحويله مباشرة لصفحة تسجيل الدخول
       if (regRes.alreadyExists) {
-        setError("");
-        setSuccessMsg(regRes.message || "يوجد مستخدم بالفعل مسجل بهذا الرقم أو البريد، تم تحويلك لتسجيل الدخول.");
+        if (regRes.isGoogle) {
+          setError(regRes.message || "هذا البريد الإلكتروني مسجل بالفعل بواسطة حساب Google، يرجى تسجيل الدخول عبر Google.");
+          setSuccessMsg("");
+        } else {
+          setError("");
+          setSuccessMsg(regRes.message || "يوجد مستخدم بالفعل مسجل بهذا الرقم أو البريد، تم تحويلك لتسجيل الدخول.");
+        }
         setLoginIdentifier(regRes.identifier || cleanPhone);
         setPassword("");
         setAuthMode("signin");
