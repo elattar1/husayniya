@@ -26,6 +26,7 @@ import { lovable } from "@/integrations/lovable";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { pageMeta } from "@/lib/page-meta";
+import { registerUserDirectly, autoConfirmUser } from "@/lib/auth.functions";
 
 export const Route = createFileRoute("/auth")({
   validateSearch: (s: Record<string, unknown>) => {
@@ -134,18 +135,22 @@ function Auth() {
         password: password.trim(),
       });
       if (signInErr) {
-        // إذا كان الحساب غير مؤكد بعد
+        // إذا كان الحساب غير مؤكد بعد، نقوم بتفعيله وتأكيده تلقائياً وإعادة تسجيل الدخول
         if (signInErr.message.includes("Email not confirmed")) {
           try {
-            await supabase.auth.resend({ type: "signup", email: cleanEmail });
-          } catch {
-            await supabase.auth.signInWithOtp({ email: cleanEmail });
+            await autoConfirmUser({ data: { email: cleanEmail } });
+            const retry = await supabase.auth.signInWithPassword({
+              email: cleanEmail,
+              password: password.trim(),
+            });
+            if (retry.data?.session) {
+              navigate({ to: targetPath });
+              return;
+            }
+            if (retry.error) throw retry.error;
+          } catch (autoErr) {
+            console.error("Auto confirm error:", autoErr);
           }
-          setOtpType("signup");
-          setAuthMode("otp_verify");
-          setCountdown(60);
-          setSuccessMsg("حسابك غير مؤكد بعد. تم إرسال كود التأكيد إلى بريدك الإلكتروني، يرجى إدخاله للمتابعة.");
-          return;
         }
         throw signInErr;
       }
@@ -159,7 +164,7 @@ function Auth() {
     }
   }
 
-  // 2. إنشاء حساب جديد بالبريد وكلمة المرور
+  // 2. إنشاء حساب جديد بالبريد وكلمة المرور مع تفعيل فوري
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
     const cleanEmail = email.trim();
@@ -183,23 +188,42 @@ function Auth() {
     setError("");
     setSuccessMsg("");
     try {
-      const { data, error: signUpErr } = await supabase.auth.signUp({
+      // إنشاء الحساب وتأكيده مباشرة على السيرفر دون انتظار أي كود تفعيل
+      const regRes = await registerUserDirectly({
+        data: {
+          email: cleanEmail,
+          password: password.trim(),
+        },
+      });
+
+      if (!regRes.success) {
+        throw new Error("تعذر إنشاء الحساب، يرجى المحاولة لاحقاً");
+      }
+
+      // تسجيل الدخول مباشرة بعد التفعيل الفوري
+      const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
         password: password.trim(),
       });
-      if (signUpErr) throw signUpErr;
 
-      // إذا تم تسجيل الدخول مباشرة بدون تأكيد البريد
-      if (data.session) {
+      if (signInErr) {
+        // محاولة تأكيد ثانوية في حال وجود أي تزامن
+        await autoConfirmUser({ data: { email: cleanEmail } });
+        const retry = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password: password.trim(),
+        });
+        if (retry.error) throw retry.error;
+        if (retry.data?.session) {
+          navigate({ to: targetPath });
+          return;
+        }
+      }
+
+      if (signInData?.session) {
         navigate({ to: targetPath });
         return;
       }
-
-      // إذا كان تأكيد البريد الإلكتروني مطلوباً عبر كود التأكيد
-      setOtpType("signup");
-      setAuthMode("otp_verify");
-      setCountdown(60);
-      setSuccessMsg("تم إنشاء الحساب بنجاح! أرسلنا كود تأكيد مكون من 6 أرقام إلى بريدك الإلكتروني.");
     } catch (err) {
       setError(translateAuthError(err));
     } finally {
@@ -421,6 +445,32 @@ function Auth() {
                 <Button type="submit" disabled={busy || otp.length < 6} className="h-11 w-full font-bold">
                   {busy ? <LoaderCircle className="size-4 animate-spin ml-2" /> : <KeyRound className="size-4 ml-2" />}
                   تأكيد الكود ودخول الحساب
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={async () => {
+                    const cleanEmail = email.trim();
+                    if (!cleanEmail) return;
+                    setBusy(true);
+                    setError("");
+                    setSuccessMsg("");
+                    try {
+                      await autoConfirmUser({ data: { email: cleanEmail } });
+                      setSuccessMsg("تم تفعيل حسابك بنجاح! يرجى كتابة كلمة المرور لتسجيل الدخول مباشرة.");
+                      setAuthMode("signin");
+                    } catch (e: any) {
+                      setError(e?.message || "تعذر تفعيل الحساب، يرجى المحاولة لاحقاً");
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                  className="h-10 w-full text-xs font-semibold border-primary/40 text-primary hover:bg-primary/10 gap-1.5"
+                >
+                  <Sparkles className="size-3.5" />
+                  لم يصلك الكود؟ تفعيل الحساب والدخول فوراً
                 </Button>
 
                 <div className="flex items-center justify-between text-xs pt-2 border-t">
