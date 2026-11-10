@@ -1,32 +1,33 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Store,
   ArrowLeft,
   LoaderCircle,
   ShieldCheck,
   CheckCircle2,
+  Phone,
   Mail,
   Lock,
-  KeyRound,
-  RotateCcw,
   Sparkles,
   Eye,
   EyeOff,
+  KeyRound,
+  RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSlot,
-  InputOTPSeparator,
-} from "@/components/ui/input-otp";
 import { lovable } from "@/integrations/lovable";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { pageMeta } from "@/lib/page-meta";
-import { registerUserDirectly, autoConfirmUser } from "@/lib/auth.functions";
+import {
+  registerUserWithPhone,
+  resolveLoginIdentifier,
+  requestPasswordReset,
+  normalizePhone,
+  autoConfirmUser,
+} from "@/lib/auth.functions";
 
 export const Route = createFileRoute("/auth")({
   validateSearch: (s: Record<string, unknown>) => {
@@ -36,7 +37,7 @@ export const Route = createFileRoute("/auth")({
   head: () =>
     pageMeta(
       "تسجيل الدخول",
-      "تسجيل الدخول لطلب الخدمات ومتابعتها وإدارة متجرك في خدمات الحسينية عبر البريد الإلكتروني أو حساب Google"
+      "تسجيل الدخول وإدارة الطلبات والمتاجر في خدمات الحسينية برقم التليفون أو البريد الإلكتروني أو حساب Google"
     ),
   component: Auth,
 });
@@ -68,22 +69,16 @@ function translateAuthError(err: unknown): string {
   if (!err) return "حدث خطأ غير متوقع، يرجى المحاولة لاحقًا.";
   const msg = err instanceof Error ? err.message : String(err);
   if (msg.includes("Invalid login credentials")) {
-    return "البريد الإلكتروني أو كلمة المرور غير صحيحة.";
+    return "رقم التليفون أو كلمة المرور غير صحيحة.";
   }
   if (msg.includes("Email not confirmed")) {
-    return "البريد الإلكتروني غير مؤكد بعد. يرجى إدخال كود التأكيد المرسل إليك.";
+    return "تم تفعيل الحساب تلقائياً، يرجى الضغط على تسجيل الدخول مجدداً.";
   }
-  if (msg.includes("User already registered")) {
-    return "هذا البريد الإلكتروني مسجل بالفعل، يرجى تسجيل الدخول بدلاً من ذلك.";
+  if (msg.includes("User already registered") || msg.includes("already registered")) {
+    return "هذا الرقم مسجل بالفعل، يرجى تسجيل الدخول بدلاً من ذلك.";
   }
   if (msg.includes("Password should be at least")) {
     return "كلمة المرور يجب أن لا تقل عن 6 أحرف أو أرقام.";
-  }
-  if (msg.includes("Token has expired") || msg.includes("invalid") || msg.includes("Token is invalid")) {
-    return "كود التأكيد غير صحيح أو انتهت صلاحيته. يرجى التأكد من الرمز أو طلب كود جديد.";
-  }
-  if (msg.includes("rate limit") || msg.includes("over_email_send_rate_limit")) {
-    return "تم إرسال عدد كبير من الرسائل مؤخرًا، يرجى الانتظار دقيقة قبل المحاولة مرة أخرى.";
   }
   return msg || "تعذر إتمام العملية، يرجى مراجعة البيانات والمحاولة مجددًا.";
 }
@@ -93,54 +88,59 @@ function Auth() {
   const navigate = useNavigate();
   const { redirect } = Route.useSearch();
 
-  // أوضاع الشاشة: تسجيل دخول | إنشاء حساب جديد | إدخال كود التأكيد OTP
-  const [authMode, setAuthMode] = useState<"signin" | "signup" | "otp_verify">("signin");
-  const [email, setEmail] = useState("");
+  // أوضاع الشاشة: تسجيل دخول | إنشاء حساب جديد | نسيت كلمة المرور
+  const [authMode, setAuthMode] = useState<"signin" | "signup" | "forgot_password">("signin");
+
+  // حقول تسجيل الدخول
+  const [loginIdentifier, setLoginIdentifier] = useState("");
   const [password, setPassword] = useState("");
+
+  // حقول الحساب الجديد
+  const [phone, setPhone] = useState("");
+  const [recoveryEmail, setRecoveryEmail] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+
+  // حقول استعادة كلمة المرور
+  const [resetIdentifier, setResetIdentifier] = useState("");
+
+  // إظهار/إخفاء كلمة المرور
   const [showPassword, setShowPassword] = useState(false);
-  const [otp, setOtp] = useState("");
-  const [otpType, setOtpType] = useState<"signup" | "email">("signup");
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
-  const [countdown, setCountdown] = useState(0);
-
-  // مؤقت إعادة إرسال الكود
-  useEffect(() => {
-    if (countdown <= 0) return;
-    const timer = setInterval(() => {
-      setCountdown((prev) => prev - 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [countdown]);
 
   const targetPath = redirect.startsWith("/admin") ? "/admin" : redirect || "/";
 
-  // 1. تسجيل الدخول بالبريد وكلمة المرور
+  // 1. تسجيل الدخول برقم التليفون أو البريد الإلكتروني
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
-    const cleanEmail = email.trim();
-    if (!cleanEmail || !password.trim()) {
-      setError("يرجى إدخال البريد الإلكتروني وكلمة المرور");
+    const cleanId = loginIdentifier.trim();
+    if (!cleanId || !password.trim()) {
+      setError("يرجى إدخال رقم التليفون (أو البريد) وكلمة المرور");
       return;
     }
     setBusy(true);
     setError("");
     setSuccessMsg("");
     try {
+      // تحويل رقم الهاتف أو البريد إلى الحساب المعتمد
+      const resolveRes = await resolveLoginIdentifier({
+        data: { identifier: cleanId },
+      });
+
       const { data, error: signInErr } = await supabase.auth.signInWithPassword({
-        email: cleanEmail,
+        email: resolveRes.authEmail,
         password: password.trim(),
       });
+
       if (signInErr) {
-        // إذا كان الحساب غير مؤكد بعد، نقوم بتفعيله وتأكيده تلقائياً وإعادة تسجيل الدخول
+        // إذا كان الحساب بحاجة لتأكيد فوري
         if (signInErr.message.includes("Email not confirmed")) {
           try {
-            await autoConfirmUser({ data: { email: cleanEmail } });
+            await autoConfirmUser({ data: { email: resolveRes.authEmail } });
             const retry = await supabase.auth.signInWithPassword({
-              email: cleanEmail,
+              email: resolveRes.authEmail,
               password: password.trim(),
             });
             if (retry.data?.session) {
@@ -149,27 +149,28 @@ function Auth() {
             }
             if (retry.error) throw retry.error;
           } catch (autoErr) {
-            console.error("Auto confirm error:", autoErr);
+            console.error("Auto confirm retry error:", autoErr);
           }
         }
         throw signInErr;
       }
+
       if (data.session) {
         navigate({ to: targetPath });
       }
-    } catch (err) {
+    } catch (err: any) {
       setError(translateAuthError(err));
     } finally {
       setBusy(false);
     }
   }
 
-  // 2. إنشاء حساب جديد بالبريد وكلمة المرور مع تفعيل فوري
+  // 2. إنشاء حساب جديد برقم التليفون، وتفعيل فوري بدون كود
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
-    const cleanEmail = email.trim();
-    if (!cleanEmail || !password.trim()) {
-      setError("يرجى إدخال البريد الإلكتروني وكلمة المرور");
+    const cleanPhone = normalizePhone(phone);
+    if (!cleanPhone || cleanPhone.length < 10) {
+      setError("يرجى إدخال رقم تليفون صحيح (مثال: 01012345678)");
       return;
     }
     if (password.trim().length < 6) {
@@ -188,11 +189,12 @@ function Auth() {
     setError("");
     setSuccessMsg("");
     try {
-      // إنشاء الحساب وتأكيده مباشرة على السيرفر دون انتظار أي كود تفعيل
-      const regRes = await registerUserDirectly({
+      // إنشاء الحساب وتفعيله فوراً على السيرفر
+      const regRes = await registerUserWithPhone({
         data: {
-          email: cleanEmail,
+          phone: cleanPhone,
           password: password.trim(),
+          email: recoveryEmail.trim() || undefined,
         },
       });
 
@@ -202,15 +204,14 @@ function Auth() {
 
       // تسجيل الدخول مباشرة بعد التفعيل الفوري
       const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
-        email: cleanEmail,
+        email: regRes.authEmail,
         password: password.trim(),
       });
 
       if (signInErr) {
-        // محاولة تأكيد ثانوية في حال وجود أي تزامن
-        await autoConfirmUser({ data: { email: cleanEmail } });
+        await autoConfirmUser({ data: { email: regRes.authEmail } });
         const retry = await supabase.auth.signInWithPassword({
-          email: cleanEmail,
+          email: regRes.authEmail,
           password: password.trim(),
         });
         if (retry.error) throw retry.error;
@@ -224,108 +225,41 @@ function Auth() {
         navigate({ to: targetPath });
         return;
       }
-    } catch (err) {
+    } catch (err: any) {
       setError(translateAuthError(err));
     } finally {
       setBusy(false);
     }
   }
 
-  // 3. التحقق من كود الـ OTP
-  async function handleVerifyOtp(e: React.FormEvent) {
+  // 3. إعادة تعيين كلمة المرور عبر البريد الإلكتروني
+  async function handleForgotPassword(e: React.FormEvent) {
     e.preventDefault();
-    const cleanEmail = email.trim();
-    const cleanOtp = otp.trim();
-    if (!cleanOtp || cleanOtp.length < 6) {
-      setError("يرجى إدخال كود التأكيد المكون من 6 أرقام كاملاً");
+    const cleanId = resetIdentifier.trim();
+    if (!cleanId) {
+      setError("يرجى إدخال رقم التليفون أو البريد الإلكتروني المسجل");
       return;
     }
     setBusy(true);
     setError("");
     setSuccessMsg("");
     try {
-      let verifyRes = await supabase.auth.verifyOtp({
-        email: cleanEmail,
-        token: cleanOtp,
-        type: otpType,
+      const res = await requestPasswordReset({
+        data: {
+          identifier: cleanId,
+          redirectUrl: `${window.location.origin}/auth`,
+        },
       });
 
-      // تجربة النوع البديل إذا فشل النوع الأول
-      if (verifyRes.error) {
-        const altType = otpType === "signup" ? "email" : "signup";
-        verifyRes = await supabase.auth.verifyOtp({
-          email: cleanEmail,
-          token: cleanOtp,
-          type: altType,
-        });
-      }
-
-      if (verifyRes.error) throw verifyRes.error;
-
-      setSuccessMsg("تم تأكيد البريد الإلكتروني بنجاح! جاري تحويلك...");
-      setTimeout(() => {
-        navigate({ to: targetPath });
-      }, 500);
-    } catch (err) {
-      setError(translateAuthError(err));
+      setSuccessMsg(res.message || `تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك: ${res.maskedEmail}`);
+    } catch (err: any) {
+      setError(err?.message || "تعذر إرسال رابط إعادة التعيين، يرجى التأكد من البيانات");
     } finally {
       setBusy(false);
     }
   }
 
-  // 4. إعادة إرسال كود التأكيد
-  async function handleResendCode() {
-    if (countdown > 0 || busy) return;
-    const cleanEmail = email.trim();
-    if (!cleanEmail) {
-      setError("يرجى إدخال بريدك الإلكتروني لإعادة إرسال الكود");
-      return;
-    }
-    setBusy(true);
-    setError("");
-    try {
-      if (otpType === "signup") {
-        const { error: resendErr } = await supabase.auth.resend({ type: "signup", email: cleanEmail });
-        if (resendErr) {
-          await supabase.auth.signInWithOtp({ email: cleanEmail });
-        }
-      } else {
-        const { error: otpErr } = await supabase.auth.signInWithOtp({ email: cleanEmail });
-        if (otpErr) throw otpErr;
-      }
-      setCountdown(60);
-      setSuccessMsg("تمت إعادة إرسال كود تأكيد جديد إلى بريدك الإلكتروني بنجاح.");
-    } catch (err) {
-      setError(translateAuthError(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // 5. تسجيل دخول سريع عبر كود الإيميل (بدون كلمة مرور)
-  async function handleQuickOtpLogin() {
-    const cleanEmail = email.trim();
-    if (!cleanEmail) {
-      setError("يرجى كتابة بريدك الإلكتروني أولاً لإرسال كود الدخول");
-      return;
-    }
-    setBusy(true);
-    setError("");
-    try {
-      const { error: otpErr } = await supabase.auth.signInWithOtp({ email: cleanEmail });
-      if (otpErr) throw otpErr;
-      setOtpType("email");
-      setAuthMode("otp_verify");
-      setCountdown(60);
-      setSuccessMsg("تم إرسال كود الدخول السريع المكون من 6 أرقام إلى بريدك الإلكتروني.");
-    } catch (err) {
-      setError(translateAuthError(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // 6. تسجيل الدخول بواسطة Google
+  // 4. تسجيل الدخول السريع بواسطة Google
   async function signInGoogle() {
     setBusy(true);
     setError("");
@@ -347,6 +281,13 @@ function Auth() {
     }
   }
 
+  const displayUser =
+    user?.user_metadata?.phone ||
+    (user?.email?.endsWith("@phone.husayniya.app")
+      ? user?.email.replace("@phone.husayniya.app", "")
+      : user?.email) ||
+    "حساب مسجل";
+
   return (
     <div className="mx-auto flex min-h-[75vh] max-w-md flex-col justify-center px-4 py-10">
       <div className="rounded-2xl border bg-card p-6 shadow-soft sm:p-8">
@@ -359,9 +300,9 @@ function Auth() {
           <p className="mt-1 text-xs text-muted-foreground">
             {user
               ? "مرحبًا بك، تم تسجيل دخولك بنجاح"
-              : authMode === "otp_verify"
-                ? "تأكيد كود التحقق المرسل إلى بريدك"
-                : "تسجيل الدخول وإدارة الطلبات والمتاجر في الحسينية"}
+              : authMode === "forgot_password"
+                ? "إعادة تعيين كلمة المرور عبر البريد المسجل"
+                : "تسجيل الدخول برقم التليفون وإدارة طلباتك ومتاجرك في الحسينية"}
           </p>
         </div>
 
@@ -369,7 +310,9 @@ function Auth() {
         {user ? (
           <div className="space-y-3">
             <div className="rounded-xl border bg-secondary/50 p-3 text-center text-sm">
-              <p className="font-medium text-foreground">{user.email || "حساب مسجل"}</p>
+              <p className="font-medium text-foreground" dir="ltr">
+                {displayUser}
+              </p>
               <span className="text-[11px] text-muted-foreground mt-0.5 block">أنت مسجل الدخول حالياً</span>
             </div>
             <Button asChild className="w-full font-bold">
@@ -412,78 +355,40 @@ function Auth() {
               </div>
             )}
 
-            {/* وضع 1: التحقق من كود التأكيد (OTP) */}
-            {authMode === "otp_verify" ? (
-              <form onSubmit={handleVerifyOtp} className="space-y-4">
+            {/* وضع 1: نسيت كلمة المرور (إعادة التعيين عبر البريد) */}
+            {authMode === "forgot_password" ? (
+              <form onSubmit={handleForgotPassword} className="space-y-4">
                 <div className="rounded-xl border bg-muted/40 p-3.5 text-center text-xs text-muted-foreground leading-relaxed">
-                  <Mail className="size-5 mx-auto mb-1.5 text-primary" />
-                  <span>تم إرسال كود تأكيد مكون من 6 أرقام إلى:</span>
-                  <p className="mt-1 font-bold text-foreground text-sm" dir="ltr">
-                    {email}
-                  </p>
+                  <KeyRound className="size-5 mx-auto mb-1.5 text-primary" />
+                  <span>أدخل رقم هاتفك أو بريدك الإلكتروني المسجل وسنرسل لك رابط إعادة تعيين كلمة المرور على بريدك:</span>
                 </div>
 
-                <div className="flex flex-col items-center gap-2 pt-1">
-                  <label className="text-xs font-semibold text-muted-foreground">أدخل كود التأكيد (6 أرقام):</label>
-                  <div dir="ltr" className="my-1">
-                    <InputOTP maxLength={6} value={otp} onChange={setOtp} disabled={busy}>
-                      <InputOTPGroup>
-                        <InputOTPSlot index={0} />
-                        <InputOTPSlot index={1} />
-                        <InputOTPSlot index={2} />
-                      </InputOTPGroup>
-                      <InputOTPSeparator />
-                      <InputOTPGroup>
-                        <InputOTPSlot index={3} />
-                        <InputOTPSlot index={4} />
-                        <InputOTPSlot index={5} />
-                      </InputOTPGroup>
-                    </InputOTP>
-                  </div>
+                <div className="space-y-1.5 text-right">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5 justify-end">
+                    <span>رقم التليفون أو البريد الإلكتروني</span>
+                    <Mail className="size-3.5 text-muted-foreground" />
+                  </label>
+                  <Input
+                    type="text"
+                    required
+                    placeholder="01xxxxxxxxx أو name@example.com"
+                    value={resetIdentifier}
+                    onChange={(e) => {
+                      setResetIdentifier(e.target.value);
+                      setError("");
+                    }}
+                    disabled={busy}
+                    className="h-11 text-left"
+                    dir="ltr"
+                  />
                 </div>
 
-                <Button type="submit" disabled={busy || otp.length < 6} className="h-11 w-full font-bold">
-                  {busy ? <LoaderCircle className="size-4 animate-spin ml-2" /> : <KeyRound className="size-4 ml-2" />}
-                  تأكيد الكود ودخول الحساب
+                <Button type="submit" disabled={busy} className="h-11 w-full font-bold">
+                  {busy ? <LoaderCircle className="size-4 animate-spin ml-2" /> : <RotateCcw className="size-4 ml-2" />}
+                  إرسال رابط إعادة التعيين
                 </Button>
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={busy}
-                  onClick={async () => {
-                    const cleanEmail = email.trim();
-                    if (!cleanEmail) return;
-                    setBusy(true);
-                    setError("");
-                    setSuccessMsg("");
-                    try {
-                      await autoConfirmUser({ data: { email: cleanEmail } });
-                      setSuccessMsg("تم تفعيل حسابك بنجاح! يرجى كتابة كلمة المرور لتسجيل الدخول مباشرة.");
-                      setAuthMode("signin");
-                    } catch (e: any) {
-                      setError(e?.message || "تعذر تفعيل الحساب، يرجى المحاولة لاحقاً");
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
-                  className="h-10 w-full text-xs font-semibold border-primary/40 text-primary hover:bg-primary/10 gap-1.5"
-                >
-                  <Sparkles className="size-3.5" />
-                  لم يصلك الكود؟ تفعيل الحساب والدخول فوراً
-                </Button>
-
-                <div className="flex items-center justify-between text-xs pt-2 border-t">
-                  <button
-                    type="button"
-                    onClick={handleResendCode}
-                    disabled={countdown > 0 || busy}
-                    className="text-primary hover:underline font-semibold disabled:text-muted-foreground disabled:no-underline flex items-center gap-1"
-                  >
-                    <RotateCcw className="size-3" />
-                    {countdown > 0 ? `إعادة الإرسال بعد (${countdown} ثانية)` : "إعادة إرسال الكود"}
-                  </button>
-
+                <div className="text-center pt-2 border-t">
                   <button
                     type="button"
                     onClick={() => {
@@ -491,14 +396,14 @@ function Auth() {
                       setError("");
                       setSuccessMsg("");
                     }}
-                    className="text-muted-foreground hover:text-foreground underline"
+                    className="text-xs text-primary hover:underline font-semibold"
                   >
-                    تغيير البريد الإلكتروني
+                    العودة إلى تسجيل الدخول
                   </button>
                 </div>
               </form>
             ) : (
-              /* وضع 2: تسجيل الدخول أو إنشاء حساب بالبريد وكلمة المرور */
+              /* وضع 2: تسجيل الدخول أو حساب جديد برقم التليفون */
               <div className="space-y-4">
                 {/* شريط التبديل بين تسجيل الدخول وحساب جديد */}
                 <div className="grid grid-cols-2 rounded-xl bg-muted p-1 text-xs font-semibold">
@@ -508,10 +413,11 @@ function Auth() {
                       setAuthMode("signin");
                       setError("");
                       setSuccessMsg("");
-                      setConfirmPassword("");
                     }}
                     className={`rounded-lg py-2 transition-all ${
-                      authMode === "signin" ? "bg-background text-foreground shadow-xs font-bold" : "text-muted-foreground hover:text-foreground"
+                      authMode === "signin"
+                        ? "bg-background text-foreground shadow-xs font-bold"
+                        : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     تسجيل الدخول
@@ -522,77 +428,182 @@ function Auth() {
                       setAuthMode("signup");
                       setError("");
                       setSuccessMsg("");
-                      setConfirmPassword("");
                     }}
                     className={`rounded-lg py-2 transition-all ${
-                      authMode === "signup" ? "bg-background text-foreground shadow-xs font-bold" : "text-muted-foreground hover:text-foreground"
+                      authMode === "signup"
+                        ? "bg-background text-foreground shadow-xs font-bold"
+                        : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     حساب جديد
                   </button>
                 </div>
 
-                {/* نموذج البريد وكلمة المرور */}
-                <form onSubmit={authMode === "signin" ? handleSignIn : handleSignUp} className="space-y-3.5">
-                  <div className="space-y-1.5 text-right">
-                    <label className="text-xs font-semibold text-foreground flex items-center gap-1.5 justify-end">
-                      <span>البريد الإلكتروني</span>
-                      <Mail className="size-3.5 text-muted-foreground" />
-                    </label>
-                    <Input
-                      type="email"
-                      required
-                      placeholder="name@example.com"
-                      value={email}
-                      onChange={(e) => {
-                        setEmail(e.target.value);
-                        setError("");
-                      }}
-                      disabled={busy}
-                      className="h-11 text-left"
-                      dir="ltr"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5 text-right">
-                    <label className="text-xs font-semibold text-foreground flex items-center gap-1.5 justify-end">
-                      <span>كلمة المرور</span>
-                      <Lock className="size-3.5 text-muted-foreground" />
-                    </label>
-                    <div className="relative">
+                {/* نموذج تسجيل الدخول */}
+                {authMode === "signin" ? (
+                  <form onSubmit={handleSignIn} className="space-y-3.5">
+                    <div className="space-y-1.5 text-right">
+                      <label className="text-xs font-semibold text-foreground flex items-center gap-1.5 justify-end">
+                        <span>رقم التليفون أو البريد الإلكتروني</span>
+                        <Phone className="size-3.5 text-muted-foreground" />
+                      </label>
                       <Input
-                        type={showPassword ? "text" : "password"}
+                        type="text"
                         required
-                        placeholder="••••••••"
-                        value={password}
+                        placeholder="01xxxxxxxxx أو البريد الإلكتروني"
+                        value={loginIdentifier}
                         onChange={(e) => {
-                          setPassword(e.target.value);
+                          setLoginIdentifier(e.target.value);
                           setError("");
                         }}
                         disabled={busy}
-                        className="h-11 text-left pl-10"
+                        className="h-11 text-left"
                         dir="ltr"
-                        minLength={6}
                       />
+                    </div>
+
+                    <div className="space-y-1.5 text-right">
+                      <label className="text-xs font-semibold text-foreground flex items-center gap-1.5 justify-end">
+                        <span>كلمة المرور</span>
+                        <Lock className="size-3.5 text-muted-foreground" />
+                      </label>
+                      <div className="relative">
+                        <Input
+                          type={showPassword ? "text" : "password"}
+                          required
+                          placeholder="••••••••"
+                          value={password}
+                          onChange={(e) => {
+                            setPassword(e.target.value);
+                            setError("");
+                          }}
+                          disabled={busy}
+                          className="h-11 text-left pl-10"
+                          dir="ltr"
+                          minLength={6}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 transition-colors"
+                          tabIndex={-1}
+                          aria-label={showPassword ? "إخفاء كلمة المرور" : "عرض كلمة المرور"}
+                        >
+                          {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <Button type="submit" disabled={busy} className="h-11 w-full font-bold shadow-sm">
+                      {busy ? <LoaderCircle className="size-4 animate-spin ml-2" /> : <ArrowLeft className="size-4 ml-2" />}
+                      تسجيل الدخول
+                    </Button>
+
+                    {/* رابط استعادة كلمة السر عبر الإيميل */}
+                    <div className="text-center pt-1">
                       <button
                         type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 transition-colors"
-                        tabIndex={-1}
-                        aria-label={showPassword ? "إخفاء كلمة المرور" : "عرض كلمة المرور"}
+                        onClick={() => {
+                          setAuthMode("forgot_password");
+                          setError("");
+                          setSuccessMsg("");
+                          setResetIdentifier(loginIdentifier);
+                        }}
+                        disabled={busy}
+                        className="text-xs text-primary hover:underline font-medium"
                       >
-                        {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                        نسيت كلمة المرور؟ إعادة تعيين عبر البريد الإلكتروني
                       </button>
                     </div>
-                    {authMode === "signup" && (
-                      <p className="text-[11px] text-muted-foreground">يجب أن لا تقل كلمة المرور عن 6 أحرف أو أرقام</p>
-                    )}
-                  </div>
+                  </form>
+                ) : (
+                  /* نموذج إنشاء حساب جديد */
+                  <form onSubmit={handleSignUp} className="space-y-3.5">
+                    {/* رقم التليفون */}
+                    <div className="space-y-1.5 text-right">
+                      <label className="text-xs font-semibold text-foreground flex items-center gap-1.5 justify-end">
+                        <span>رقم التليفون / الموبايل</span>
+                        <span className="text-destructive">*</span>
+                        <Phone className="size-3.5 text-muted-foreground" />
+                      </label>
+                      <Input
+                        type="tel"
+                        required
+                        placeholder="01012345678"
+                        value={phone}
+                        onChange={(e) => {
+                          setPhone(e.target.value);
+                          setError("");
+                        }}
+                        disabled={busy}
+                        className="h-11 text-left"
+                        dir="ltr"
+                      />
+                      <p className="text-[11px] text-muted-foreground">التسجيل يتم فورياً بدون انتظار أي كود تأكيد</p>
+                    </div>
 
-                  {authMode === "signup" && (
+                    {/* البريد الإلكتروني لاستعادة كلمة السر */}
+                    <div className="space-y-1.5 text-right">
+                      <label className="text-xs font-semibold text-foreground flex items-center gap-1.5 justify-end">
+                        <span>البريد الإلكتروني</span>
+                        <span className="text-[11px] text-muted-foreground font-normal">(اختياري / لاستعادة كلمة المرور)</span>
+                        <Mail className="size-3.5 text-muted-foreground" />
+                      </label>
+                      <Input
+                        type="email"
+                        placeholder="name@example.com"
+                        value={recoveryEmail}
+                        onChange={(e) => {
+                          setRecoveryEmail(e.target.value);
+                          setError("");
+                        }}
+                        disabled={busy}
+                        className="h-11 text-left"
+                        dir="ltr"
+                      />
+                      <p className="text-[11px] text-muted-foreground">يُستخدم لإرسال رابط إعادة تعيين كلمة المرور في حال نسيانها</p>
+                    </div>
+
+                    {/* كلمة المرور */}
+                    <div className="space-y-1.5 text-right">
+                      <label className="text-xs font-semibold text-foreground flex items-center gap-1.5 justify-end">
+                        <span>كلمة المرور</span>
+                        <span className="text-destructive">*</span>
+                        <Lock className="size-3.5 text-muted-foreground" />
+                      </label>
+                      <div className="relative">
+                        <Input
+                          type={showPassword ? "text" : "password"}
+                          required
+                          placeholder="••••••••"
+                          value={password}
+                          onChange={(e) => {
+                            setPassword(e.target.value);
+                            setError("");
+                          }}
+                          disabled={busy}
+                          className="h-11 text-left pl-10"
+                          dir="ltr"
+                          minLength={6}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 transition-colors"
+                          tabIndex={-1}
+                          aria-label={showPassword ? "إخفاء كلمة المرور" : "عرض كلمة المرور"}
+                        >
+                          {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">يجب أن لا تقل كلمة المرور عن 6 أحرف أو أرقام</p>
+                    </div>
+
+                    {/* تأكيد كلمة المرور */}
                     <div className="space-y-1.5 text-right">
                       <label className="text-xs font-semibold text-foreground flex items-center gap-1.5 justify-end">
                         <span>تأكيد كلمة المرور</span>
+                        <span className="text-destructive">*</span>
                         <Lock className="size-3.5 text-muted-foreground" />
                       </label>
                       <div className="relative">
@@ -621,33 +632,13 @@ function Auth() {
                         </button>
                       </div>
                     </div>
-                  )}
 
-                  <Button type="submit" disabled={busy} className="h-11 w-full font-bold shadow-sm">
-                    {busy ? (
-                      <LoaderCircle className="size-4 animate-spin ml-2" />
-                    ) : authMode === "signin" ? (
-                      <ArrowLeft className="size-4 ml-2" />
-                    ) : (
-                      <Sparkles className="size-4 ml-2" />
-                    )}
-                    {authMode === "signin" ? "تسجيل الدخول" : "إنشاء حساب جديد"}
-                  </Button>
-
-                  {/* رابط إرسال كود دخول سريع بدون كلمة مرور */}
-                  {authMode === "signin" && (
-                    <div className="text-center pt-1">
-                      <button
-                        type="button"
-                        onClick={handleQuickOtpLogin}
-                        disabled={busy}
-                        className="text-xs text-primary hover:underline font-medium"
-                      >
-                        نسيت كلمة المرور؟ أو أرسل لي كود دخول سريع على الإيميل
-                      </button>
-                    </div>
-                  )}
-                </form>
+                    <Button type="submit" disabled={busy} className="h-11 w-full font-bold shadow-sm">
+                      {busy ? <LoaderCircle className="size-4 animate-spin ml-2" /> : <Sparkles className="size-4 ml-2" />}
+                      إنشاء حساب جديد والدخول فوراً
+                    </Button>
+                  </form>
+                )}
 
                 {/* فاصل */}
                 <div className="relative my-4 flex items-center justify-center">
@@ -671,15 +662,15 @@ function Auth() {
                   <span>المتابعة باستخدام Google</span>
                 </Button>
 
-                {/* مميزات الأمان */}
+                {/* مميزات النظام الجديد */}
                 <div className="rounded-xl border bg-muted/20 p-3 space-y-1.5 text-xs text-muted-foreground">
                   <div className="flex items-center gap-2">
-                    <ShieldCheck className="size-4 text-primary shrink-0" />
-                    <span>حسابك محمي وتشفير آمن لبياناتك وطلباتك</span>
+                    <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <span>تفعيل فوري ودخول مباشر برقم التليفون بدون انتظار كود</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                    <span>مزامنة فورية للطلبات والعناوين مع الموبايل والموقع</span>
+                    <ShieldCheck className="size-4 text-primary shrink-0" />
+                    <span>استعادة آمنة لحسابك عبر البريد الإلكتروني في أي وقت</span>
                   </div>
                 </div>
 
