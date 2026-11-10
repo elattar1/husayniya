@@ -11,6 +11,7 @@ import { CustomerError, CustomerNotFound } from '@/components/CustomerFeedback';
 import hero from '@/assets/hero.jpg';
 import { ServiceRecommendations } from '@/components/ServiceRecommendations';
 import { useAuth } from '@/lib/auth';
+import { useOffersVisibility } from '@/lib/use-offers-visibility';
 
 export const Route = createFileRoute('/')({
   validateSearch: (s: SearchSchemaInput & { q?: unknown; category?: unknown; area?: unknown }) => ({
@@ -34,6 +35,7 @@ function Browse() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   const { appMode } = useAuth();
+  const { isVisible: isOffersVisible } = useOffersVisibility();
 
   // إذا كان المستخدم في وضع متخصص (إدارة، تاجر، سائق)، يتم فتح اللوحة المخصصة له تلقائيًا
   useEffect(() => {
@@ -143,6 +145,40 @@ function Browse() {
       </section>
 
       <ServiceRecommendations catalog={data} area={search.area} />
+
+      {/* بانر سريع لعروض الحسينية يظهر فقط إذا كانت تابة العروض مفعّلة */}
+      {isOffersVisible && (
+        <div className="mx-auto max-w-6xl px-4 pt-5">
+          <Link
+            to="/offers"
+            className="group flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-primary/10 to-emerald-500/10 border border-amber-500/30 p-4 transition-all hover:border-amber-500 hover:shadow-md"
+          >
+            <div className="flex items-center gap-3 text-right">
+              <div className="grid size-12 place-items-center rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-sm shrink-0">
+                <span className="text-xl">🔥</span>
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-base text-foreground group-hover:text-primary transition-colors">
+                    عروض وتخفيضات اليوم الكبرى في الحسينية!
+                  </span>
+                  <span className="rounded-full bg-destructive text-destructive-foreground px-2 py-0.5 text-[10px] font-extrabold animate-pulse">
+                    خصومات حصرية
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  تخفيضات على وجبات المطاعم، سلع السوبر ماركت، ومستلزمات الصيدليات مع كوبونات حصرية وتوصيل سريع.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 text-xs font-bold text-primary shrink-0 self-end sm:self-center">
+              <span>تصفح العروض الآن</span>
+              <ArrowLeft className="size-4 transition-transform group-hover:-translate-x-1" />
+            </div>
+          </Link>
+        </div>
+      )}
 
       <section className="mx-auto max-w-6xl px-4 py-7">
         <div className="mb-7 flex gap-2 overflow-x-auto pb-2">

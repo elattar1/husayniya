@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CartRouteImport } from './routes/cart'
+import { Route as OffersRouteImport } from './routes/offers'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedDeliveryRouteImport } from './routes/_authenticated/delivery'
 import { Route as AuthenticatedDriversRouteImport } from './routes/_authenticated/drivers'
@@ -44,6 +45,11 @@ const AuthRoute = AuthRouteImport.update({
 const CartRoute = CartRouteImport.update({
   id: '/cart',
   path: '/cart',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OffersRoute = OffersRouteImport.update({
+  id: '/offers',
+  path: '/offers',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
@@ -88,6 +94,7 @@ export interface FileRoutesByFullPath {
   '/account': typeof AccountRoute
   '/auth': typeof AuthRoute
   '/cart': typeof CartRoute
+  '/offers': typeof OffersRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/delivery': typeof AuthenticatedDeliveryRoute
   '/drivers': typeof AuthenticatedDriversRoute
@@ -101,6 +108,7 @@ export interface FileRoutesByTo {
   '/account': typeof AccountRoute
   '/auth': typeof AuthRoute
   '/cart': typeof CartRoute
+  '/offers': typeof OffersRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/delivery': typeof AuthenticatedDeliveryRoute
   '/drivers': typeof AuthenticatedDriversRoute
@@ -116,6 +124,7 @@ export interface FileRoutesById {
   '/account': typeof AccountRoute
   '/auth': typeof AuthRoute
   '/cart': typeof CartRoute
+  '/offers': typeof OffersRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/delivery': typeof AuthenticatedDeliveryRoute
   '/_authenticated/drivers': typeof AuthenticatedDriversRoute
@@ -131,6 +140,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/auth'
     | '/cart'
+    | '/offers'
     | '/admin'
     | '/delivery'
     | '/drivers'
@@ -144,6 +154,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/auth'
     | '/cart'
+    | '/offers'
     | '/admin'
     | '/delivery'
     | '/drivers'
@@ -158,6 +169,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/auth'
     | '/cart'
+    | '/offers'
     | '/_authenticated/admin'
     | '/_authenticated/delivery'
     | '/_authenticated/drivers'
@@ -173,6 +185,7 @@ export interface RootRouteChildren {
   AccountRoute: typeof AccountRoute
   AuthRoute: typeof AuthRoute
   CartRoute: typeof CartRoute
+  OffersRoute: typeof OffersRoute
   StoresStoreIdRoute: typeof StoresStoreIdRoute
 }
 
@@ -211,6 +224,13 @@ declare module '@tanstack/react-router' {
       path: '/cart'
       fullPath: '/cart'
       preLoaderRoute: typeof CartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/offers': {
+      id: '/offers'
+      path: '/offers'
+      fullPath: '/offers'
+      preLoaderRoute: typeof OffersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/admin': {
@@ -292,6 +312,7 @@ const rootRouteChildren: RootRouteChildren = {
   AccountRoute: AccountRoute,
   AuthRoute: AuthRoute,
   CartRoute: CartRoute,
+  OffersRoute: OffersRoute,
   StoresStoreIdRoute: StoresStoreIdRoute,
 }
 export const routeTree = rootRouteImport

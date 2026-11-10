@@ -14,11 +14,13 @@ import {
   PackageOpen,
   Wallet,
   ArrowRightLeft,
+  Flame,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart";
+import { useOffersVisibility } from "@/lib/use-offers-visibility";
 import { Button } from "@/components/ui/button";
 
 function useUnread() {
@@ -40,6 +42,7 @@ function useUnread() {
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, isAdmin, isDriver, isProvider, appMode, setAppMode } = useAuth();
   const cart = useCart();
+  const { isVisible: isOffersVisible } = useOffersVisibility();
   const { data: unread = 0 } = useUnread();
   const navigate = useNavigate();
   const location = useLocation();
@@ -84,6 +87,13 @@ export function AppShell({ children }: { children: ReactNode }) {
             {appMode === "customer" && (
               <>
                 <Link to="/" activeProps={active} activeOptions={{ exact: true }}>الرئيسية</Link>
+                {isOffersVisible && (
+                  <Link to="/offers" activeProps={active} className="flex items-center gap-1 font-semibold text-amber-600 dark:text-amber-400">
+                    <Flame className="size-4 animate-pulse" />
+                    <span>العروض والتخفيضات</span>
+                    <span className="rounded-full bg-destructive/15 text-destructive px-1.5 py-0.5 text-[10px] font-extrabold">خصم 🔥</span>
+                  </Link>
+                )}
                 <Link to={user ? "/orders" : "/auth"} activeProps={active}>طلباتي</Link>
               </>
             )}
@@ -165,6 +175,18 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Link to="/" className={navItem} activeProps={active} activeOptions={{ exact: true }}>
               <Home className="h-5 w-5" />الرئيسية
             </Link>
+            {isOffersVisible && (
+              <Link to="/offers" className={navItem} activeProps={active}>
+                <div className="relative">
+                  <Flame className="h-5 w-5 text-amber-500" />
+                  <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-destructive"></span>
+                  </span>
+                </div>
+                العروض 🔥
+              </Link>
+            )}
             <Link to="/cart" className={navItem} activeProps={active}>
               <div className="relative">
                 <ShoppingCart className="h-5 w-5" />
