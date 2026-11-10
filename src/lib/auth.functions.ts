@@ -25,14 +25,14 @@ export function maskEmail(email: string): string {
 }
 
 const registerPhoneInput = z.object({
+  fullName: z.string().trim().min(2, "يرجى كتابة الاسم بالكامل (حرفين على الأقل)"),
   phone: z.string().trim().min(8, "رقم التليفون يجب أن لا يقل عن 8 أرقام"),
   password: z.string().min(6, "كلمة المرور يجب أن لا تقل عن 6 أحرف"),
   email: z.string().trim().email("البريد الإلكتروني غير صحيح").optional().or(z.literal("")),
-  fullName: z.string().trim().optional(),
 });
 
 const resolveInput = z.object({
-  identifier: z.string().trim().min(3, "يرجى إدخال رقم التليفون أو البريد الإلكتروني"),
+  identifier: z.string().trim().min(2, "يرجى إدخال الاسم أو رقم التليفون أو البريد"),
 });
 
 const resetInput = z.object({
@@ -40,9 +40,9 @@ const resetInput = z.object({
   redirectUrl: z.string().optional(),
 });
 
-/** تسجيل حساب جديد برقم التليفون، مع خيار إدخال بريد لاستعادة كلمة السر، وتفعيل فوري */
+/** تسجيل حساب جديد برقم التليفون والاسم، والتحقق المسبق من عدم وجود مستخدم مسجل مسبقاً */
 export const registerUserWithPhone = createServerFn({ method: "POST" })
-  .validator((data: { phone: string; password: string; email?: string; fullName?: string }) =>
+  .validator((data: { fullName: string; phone: string; password: string; email?: string }) =>
     registerPhoneInput.parse(data)
   )
   .handler(async ({ data }) => {
@@ -55,21 +55,79 @@ export const registerUserWithPhone = createServerFn({ method: "POST" })
     const recoveryEmail = data.email?.trim().toLowerCase() || null;
     const systemEmail = `${cleanPhone}@phone.husayniya.app`;
 
-    // 1. محاولة إنشاء الحساب مباشرة مع التفعيل الفوري
+    // 1. التحقق أولاً من عدم وجود مستخدم مسجل بنفس رقم التليفون في profiles
+    try {
+      const existingProfile = await supabaseAdmin
+        .from("profiles")
+        .select("id")
+        .eq("phone", cleanPhone)
+        .maybeSingle();
+
+      if (existingProfile.data?.id) {
+        return {
+          success: false,
+          alreadyExists: true,
+          identifier: cleanPhone,
+          message: "يوجد مستخدم بالفعل مسجل برقم الهاتف هذا",
+        };
+      }
+    } catch (profErr) {
+      console.warn("Could not check profiles for existing phone:", profErr);
+    }
+
+    // 2. التحقق من قائمة مستخدمي Auth من الهاتف أو البريد
+    try {
+      const list = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+      const users = list.data?.users ?? [];
+
+      const phoneConflict = users.find(
+        (u) =>
+          u.email?.toLowerCase().trim() === systemEmail ||
+          u.user_metadata?.phone === cleanPhone ||
+          u.phone === cleanPhone
+      );
+
+      if (phoneConflict) {
+        return {
+          success: false,
+          alreadyExists: true,
+          identifier: cleanPhone,
+          message: "يوجد مستخدم بالفعل مسجل برقم الهاتف هذا",
+        };
+      }
+
+      if (recoveryEmail) {
+        const emailConflict = users.find(
+          (u) =>
+            u.email?.toLowerCase().trim() === recoveryEmail ||
+            u.user_metadata?.recovery_email?.toLowerCase().trim() === recoveryEmail
+        );
+
+        if (emailConflict) {
+          return {
+            success: false,
+            alreadyExists: true,
+            identifier: recoveryEmail,
+            message: "يوجد مستخدم بالفعل مسجل بهذا البريد الإلكتروني",
+          };
+        }
+      }
+    } catch (authListErr) {
+      console.warn("Could not check auth users list:", authListErr);
+    }
+
+    // 3. إنشاء الحساب الجديد مباشرة مع التفعيل الفوري
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email: systemEmail,
       password: data.password,
       email_confirm: true,
       user_metadata: {
+        full_name: data.fullName,
         phone: cleanPhone,
         recovery_email: recoveryEmail,
-        full_name: data.fullName || `مستخدم ${cleanPhone.slice(-4)}`,
       },
     });
 
-    let userId = newUser?.user?.id;
-
-    // 2. إذا كان الرقم مسجلاً بالفعل، نقوم بتحديث كلمة المرور وتأكيد الحساب
     const errorMsg = createError?.message?.toLowerCase() || "";
     if (
       createError &&
@@ -78,42 +136,25 @@ export const registerUserWithPhone = createServerFn({ method: "POST" })
         errorMsg.includes("unique constraint") ||
         errorMsg.includes("exists"))
     ) {
-      try {
-        const list = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
-        const existing = list.data?.users?.find(
-          (u) =>
-            u.email?.toLowerCase().trim() === systemEmail ||
-            u.user_metadata?.phone === cleanPhone ||
-            (recoveryEmail && u.user_metadata?.recovery_email === recoveryEmail)
-        );
-        if (existing) {
-          userId = existing.id;
-          const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(existing.id, {
-            password: data.password,
-            email_confirm: true,
-            user_metadata: {
-              ...(existing.user_metadata || {}),
-              phone: cleanPhone,
-              recovery_email: recoveryEmail || existing.user_metadata?.recovery_email || null,
-            },
-          });
-          if (updateError) throw updateError;
-        }
-      } catch (findErr: any) {
-        console.error("Failed to update existing user:", findErr);
-        throw new Error(findErr?.message || "هذا الرقم مسجل بالفعل، يرجى تسجيل الدخول");
-      }
-    } else if (createError) {
+      return {
+        success: false,
+        alreadyExists: true,
+        identifier: cleanPhone,
+        message: "يوجد مستخدم بالفعل مسجل بهذه البيانات",
+      };
+    }
+
+    if (createError) {
       throw new Error(createError.message);
     }
 
-    // 3. تحديث جدول البروفايل بالهاتف والاسم
-    if (userId) {
+    // 4. حفظ الاسم الكامل ورقم التليفون في جدول profiles
+    if (newUser?.user?.id) {
       try {
         await supabaseAdmin.from("profiles").upsert({
-          id: userId,
+          id: newUser.user.id,
           phone: cleanPhone,
-          full_name: data.fullName || `مستخدم ${cleanPhone.slice(-4)}`,
+          full_name: data.fullName,
         });
       } catch (pErr) {
         console.warn("Could not upsert profile row:", pErr);
@@ -122,22 +163,22 @@ export const registerUserWithPhone = createServerFn({ method: "POST" })
 
     return {
       success: true,
+      alreadyExists: false,
       authEmail: systemEmail,
       phone: cleanPhone,
     };
   });
 
-/** تحويل رقم الهاتف أو البريد إلى البريد المعتمد لتسجيل الدخول */
+/** تحويل الاسم أو رقم الهاتف أو البريد إلى البريد المعتمد لتسجيل الدخول */
 export const resolveLoginIdentifier = createServerFn({ method: "POST" })
   .validator((data: { identifier: string }) => resolveInput.parse(data))
   .handler(async ({ data }) => {
     const raw = data.identifier.trim();
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // أ) إذا كان المدخل بريداً إلكترونياً
+    // أ) إذا كان المدخل بريداً إلكترونياً (يحوي @)
     if (raw.includes("@")) {
       const cleanEmail = raw.toLowerCase();
-      // تحقق هل مسجل كبريد رئيسي أو كبريد استعادة لحساب هاتف
       const list = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
       const found = list.data?.users?.find(
         (u) =>
@@ -150,45 +191,67 @@ export const resolveLoginIdentifier = createServerFn({ method: "POST" })
       return { authEmail: cleanEmail, phone: null };
     }
 
-    // ب) إذا كان المدخل رقم هاتف
+    // ب) إذا كان المدخل أرقاماً (رقم هاتف)
     const cleanPhone = normalizePhone(raw);
     const systemEmail = `${cleanPhone}@phone.husayniya.app`;
 
-    // 1. بحث في البروفايلات أولاً
+    if (cleanPhone.length >= 8) {
+      // بحث في البروفايلات أولاً
+      try {
+        const prof = await supabaseAdmin
+          .from("profiles")
+          .select("id")
+          .eq("phone", cleanPhone)
+          .maybeSingle();
+
+        if (prof.data?.id) {
+          const u = await supabaseAdmin.auth.admin.getUserById(prof.data.id);
+          if (u.data?.user?.email) {
+            return { authEmail: u.data.user.email, phone: cleanPhone };
+          }
+        }
+      } catch (e) {
+        console.warn("Error resolving profile by phone:", e);
+      }
+
+      // بحث في قائمة Auth
+      try {
+        const list = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+        const found = list.data?.users?.find(
+          (u) =>
+            u.email?.toLowerCase() === systemEmail ||
+            u.user_metadata?.phone === cleanPhone ||
+            u.phone === cleanPhone
+        );
+        if (found?.email) {
+          return { authEmail: found.email, phone: cleanPhone };
+        }
+      } catch (e) {
+        console.warn("Error searching auth users by phone:", e);
+      }
+
+      return { authEmail: systemEmail, phone: cleanPhone };
+    }
+
+    // ج) إذا كان المدخل اسماً (بحث بالاسم في جدول profiles)
     try {
       const prof = await supabaseAdmin
         .from("profiles")
-        .select("id")
-        .eq("phone", cleanPhone)
+        .select("id, phone")
+        .ilike("full_name", `%${raw}%`)
+        .limit(1)
         .maybeSingle();
 
       if (prof.data?.id) {
         const u = await supabaseAdmin.auth.admin.getUserById(prof.data.id);
         if (u.data?.user?.email) {
-          return { authEmail: u.data.user.email, phone: cleanPhone };
+          return { authEmail: u.data.user.email, phone: prof.data.phone || null };
         }
       }
     } catch (e) {
-      console.warn("Error resolving profile by phone:", e);
+      console.warn("Error searching profiles by name:", e);
     }
 
-    // 2. بحث في قائمة مستخدمي Auth
-    try {
-      const list = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
-      const found = list.data?.users?.find(
-        (u) =>
-          u.email?.toLowerCase() === systemEmail ||
-          u.user_metadata?.phone === cleanPhone ||
-          u.phone === cleanPhone
-      );
-      if (found?.email) {
-        return { authEmail: found.email, phone: cleanPhone };
-      }
-    } catch (e) {
-      console.warn("Error searching auth users by phone:", e);
-    }
-
-    // افتراضياً نستخدم البريد النظامي المقترن بالهاتف
     return { authEmail: systemEmail, phone: cleanPhone };
   });
 

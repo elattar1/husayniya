@@ -14,6 +14,7 @@ import {
   EyeOff,
   KeyRound,
   RotateCcw,
+  User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,13 +70,13 @@ function translateAuthError(err: unknown): string {
   if (!err) return "حدث خطأ غير متوقع، يرجى المحاولة لاحقًا.";
   const msg = err instanceof Error ? err.message : String(err);
   if (msg.includes("Invalid login credentials")) {
-    return "رقم التليفون أو كلمة المرور غير صحيحة.";
+    return "البيانات المدخلة أو كلمة المرور غير صحيحة.";
   }
   if (msg.includes("Email not confirmed")) {
     return "تم تفعيل الحساب تلقائياً، يرجى الضغط على تسجيل الدخول مجدداً.";
   }
-  if (msg.includes("User already registered") || msg.includes("already registered")) {
-    return "هذا الرقم مسجل بالفعل، يرجى تسجيل الدخول بدلاً من ذلك.";
+  if (msg.includes("User already registered") || msg.includes("already registered") || msg.includes("يوجد مستخدم بالفعل")) {
+    return "يوجد مستخدم بالفعل مسجل بهذه البيانات، يرجى تسجيل الدخول.";
   }
   if (msg.includes("Password should be at least")) {
     return "كلمة المرور يجب أن لا تقل عن 6 أحرف أو أرقام.";
@@ -96,6 +97,7 @@ function Auth() {
   const [password, setPassword] = useState("");
 
   // حقول الحساب الجديد
+  const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [recoveryEmail, setRecoveryEmail] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -112,19 +114,19 @@ function Auth() {
 
   const targetPath = redirect.startsWith("/admin") ? "/admin" : redirect || "/";
 
-  // 1. تسجيل الدخول برقم التليفون أو البريد الإلكتروني
+  // 1. تسجيل الدخول بالاسم أو رقم التليفون أو البريد الإلكتروني
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
     const cleanId = loginIdentifier.trim();
     if (!cleanId || !password.trim()) {
-      setError("يرجى إدخال رقم التليفون (أو البريد) وكلمة المرور");
+      setError("يرجى إدخال الاسم، رقم التليفون، أو البريد وكلمة المرور");
       return;
     }
     setBusy(true);
     setError("");
     setSuccessMsg("");
     try {
-      // تحويل رقم الهاتف أو البريد إلى الحساب المعتمد
+      // تحويل الاسم أو رقم الهاتف أو البريد إلى الحساب المعتمد
       const resolveRes = await resolveLoginIdentifier({
         data: { identifier: cleanId },
       });
@@ -165,9 +167,14 @@ function Auth() {
     }
   }
 
-  // 2. إنشاء حساب جديد برقم التليفون، وتفعيل فوري بدون كود
+  // 2. إنشاء حساب جديد مع التحقق المسبق من وجود مستخدم بالفعل
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
+    const cleanName = fullName.trim();
+    if (!cleanName || cleanName.length < 2) {
+      setError("يرجى إدخال الاسم بالكامل");
+      return;
+    }
     const cleanPhone = normalizePhone(phone);
     if (!cleanPhone || cleanPhone.length < 10) {
       setError("يرجى إدخال رقم تليفون صحيح (مثال: 01012345678)");
@@ -189,14 +196,25 @@ function Auth() {
     setError("");
     setSuccessMsg("");
     try {
-      // إنشاء الحساب وتفعيله فوراً على السيرفر
+      // إنشاء الحساب والتحقق من عدم وجود مستخدم مسجل مسبقاً
       const regRes = await registerUserWithPhone({
         data: {
+          fullName: cleanName,
           phone: cleanPhone,
           password: password.trim(),
           email: recoveryEmail.trim() || undefined,
         },
       });
+
+      // إذا كان يوجد مستخدم بالفعل، يتم إبلاغه وتحويله مباشرة لصفحة تسجيل الدخول
+      if (regRes.alreadyExists) {
+        setError("");
+        setSuccessMsg(regRes.message || "يوجد مستخدم بالفعل مسجل بهذا الرقم أو البريد، تم تحويلك لتسجيل الدخول.");
+        setLoginIdentifier(regRes.identifier || cleanPhone);
+        setPassword("");
+        setAuthMode("signin");
+        return;
+      }
 
       if (!regRes.success) {
         throw new Error("تعذر إنشاء الحساب، يرجى المحاولة لاحقاً");
@@ -282,6 +300,7 @@ function Auth() {
   }
 
   const displayUser =
+    user?.user_metadata?.full_name ||
     user?.user_metadata?.phone ||
     (user?.email?.endsWith("@phone.husayniya.app")
       ? user?.email.replace("@phone.husayniya.app", "")
@@ -302,7 +321,7 @@ function Auth() {
               ? "مرحبًا بك، تم تسجيل دخولك بنجاح"
               : authMode === "forgot_password"
                 ? "إعادة تعيين كلمة المرور عبر البريد المسجل"
-                : "تسجيل الدخول برقم التليفون وإدارة طلباتك ومتاجرك في الحسينية"}
+                : "تسجيل الدخول وإدارة طلباتك ومتاجرك في الحسينية"}
           </p>
         </div>
 
@@ -310,7 +329,7 @@ function Auth() {
         {user ? (
           <div className="space-y-3">
             <div className="rounded-xl border bg-secondary/50 p-3 text-center text-sm">
-              <p className="font-medium text-foreground" dir="ltr">
+              <p className="font-medium text-foreground" dir="auto">
                 {displayUser}
               </p>
               <span className="text-[11px] text-muted-foreground mt-0.5 block">أنت مسجل الدخول حالياً</span>
@@ -403,7 +422,7 @@ function Auth() {
                 </div>
               </form>
             ) : (
-              /* وضع 2: تسجيل الدخول أو حساب جديد برقم التليفون */
+              /* وضع 2: تسجيل الدخول أو حساب جديد */
               <div className="space-y-4">
                 {/* شريط التبديل بين تسجيل الدخول وحساب جديد */}
                 <div className="grid grid-cols-2 rounded-xl bg-muted p-1 text-xs font-semibold">
@@ -444,21 +463,20 @@ function Auth() {
                   <form onSubmit={handleSignIn} className="space-y-3.5">
                     <div className="space-y-1.5 text-right">
                       <label className="text-xs font-semibold text-foreground flex items-center gap-1.5 justify-end">
-                        <span>رقم التليفون أو البريد الإلكتروني</span>
+                        <span>الاسم أو رقم التليفون أو البريد</span>
                         <Phone className="size-3.5 text-muted-foreground" />
                       </label>
                       <Input
                         type="text"
                         required
-                        placeholder="01xxxxxxxxx أو البريد الإلكتروني"
+                        placeholder="01xxxxxxxxx أو الاسم أو البريد الإلكتروني"
                         value={loginIdentifier}
                         onChange={(e) => {
                           setLoginIdentifier(e.target.value);
                           setError("");
                         }}
                         disabled={busy}
-                        className="h-11 text-left"
-                        dir="ltr"
+                        className="h-11 text-right"
                       />
                     </div>
 
@@ -519,6 +537,27 @@ function Auth() {
                 ) : (
                   /* نموذج إنشاء حساب جديد */
                   <form onSubmit={handleSignUp} className="space-y-3.5">
+                    {/* الاسم بالكامل */}
+                    <div className="space-y-1.5 text-right">
+                      <label className="text-xs font-semibold text-foreground flex items-center gap-1.5 justify-end">
+                        <span>الاسم بالكامل</span>
+                        <span className="text-destructive">*</span>
+                        <User className="size-3.5 text-muted-foreground" />
+                      </label>
+                      <Input
+                        type="text"
+                        required
+                        placeholder="الاسم الثلاثي أو الثنائي"
+                        value={fullName}
+                        onChange={(e) => {
+                          setFullName(e.target.value);
+                          setError("");
+                        }}
+                        disabled={busy}
+                        className="h-11 text-right"
+                      />
+                    </div>
+
                     {/* رقم التليفون */}
                     <div className="space-y-1.5 text-right">
                       <label className="text-xs font-semibold text-foreground flex items-center gap-1.5 justify-end">
@@ -666,7 +705,7 @@ function Auth() {
                 <div className="rounded-xl border bg-muted/20 p-3 space-y-1.5 text-xs text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                    <span>تفعيل فوري ودخول مباشر برقم التليفون بدون انتظار كود</span>
+                    <span>تفعيل فوري ودخول مباشر بدون انتظار كود</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="size-4 text-primary shrink-0" />
